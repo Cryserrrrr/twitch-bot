@@ -1,0 +1,41 @@
+{
+  "name": "twitch-bot",
+  "version": "1.0.0",
+  "description": "Bot Twitch complet avec intégrations Spotify, Apex Legends et OBS",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node --no-deprecation src/index.js",
+    "dev": "nodemon --no-deprecation src/index.js",
+    "setup": "node --no-deprecation src/setup.js",
+    "config": "node --no-deprecation src/config/setup.js"
+  },
+  "keywords": [
+    "twitch",
+    "bot",
+    "spotify",
+    "apex",
+    "obs"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "helmet": "^7.1.0",
+    "node-fetch": "^2.7.0",
+    "obs-websocket-js": "^5.0.3",
+    "open": "^8.4.2",
+    "spotify-web-api-node": "^5.0.2",
+    "sqlite3": "^5.1.6",
+    "tmi.js": "^1.8.5",
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
