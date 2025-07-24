@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bot Twitch - Interface de Gestion</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <!-- Authentication Modal -->
+    <div id="authModal" class="modal">
+      <div class="modal-content">
+        <div class="auth-header">
+          <h2>
+            <i class="fab fa-twitch"></i>
+            <span data-i18n="web.auth.title">Twitch Authentication</span>
+          </h2>
+          <p data-i18n="web.auth.description">
+            Connect with your Twitch account to access the administration
+            interface
+          </p>
+        </div>
+        <div class="auth-status" id="authStatus">
+          <div class="loading">
+            <i class="fas fa-spinner fa-spin"></i>
+            <span data-i18n="web.auth.checking"
+              >Checking authentication...</span
+            >
+          </div>
+        </div>
+        <div class="auth-actions" id="authActions" style="display: none">
+          <button id="loginBtn" class="twitch-btn">
+            <i class="fab fa-twitch"></i>
+            <span data-i18n="web.auth.login">Sign in with Twitch</span>
+          </button>
+          <p class="auth-note" data-i18n="web.auth.note">
+            Only moderators and the broadcaster can access this interface
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="container" id="mainContainer" style="display: none">
+      <header>
+        <div class="header-content">
+          <h1>
+            <i class="fab fa-twitch"></i>
+            <span data-i18n="web.title">Bot Twitch - Interface de Gestion</span>
+          </h1>
+          <div class="user-info" id="userInfo">
+            <img id="userAvatar" src="" alt="Avatar" />
+            <span id="userName">-</span>
+            <button id="logoutBtn" class="logout-btn">
+              <i class="fas fa-sign-out-alt"></i>
+              <span data-i18n="web.auth.logout">Déconnexion</span>
+            </button>
+          </div>
+        </div>
+        <div class="status-indicator" id="botStatus">
+          <span class="status-dot"></span>
+          <span class="status-text" data-i18n="web.dashboard.status.connecting"
+            >Connecting...</span
+          >
+        </div>
+      </header>
+
+      <nav class="tabs">
+        <button class="tab-btn active" data-tab="dashboard">
+          <i class="fas fa-tachometer-alt"></i>
+          <span data-i18n="web.tabs.dashboard">Dashboard</span>
+        </button>
+
+        <button class="tab-btn" data-tab="commands">
+          <i class="fas fa-terminal"></i>
+          <span data-i18n="web.tabs.commands">Commands</span>
+        </button>
+        <button class="tab-btn" data-tab="moderation">
+          <i class="fas fa-shield-alt"></i>
+          <span data-i18n="web.tabs.moderation">Moderation</span>
+        </button>
+        <button class="tab-btn" data-tab="recurring">
+          <i class="fas fa-clock"></i>
+          <span data-i18n="web.tabs.recurring">Recurring Messages</span>
+        </button>
+        <button class="tab-btn" data-tab="integrations">
+          <i class="fas fa-plug"></i>
+          <span data-i18n="web.tabs.integrations">Integrations</span>
+        </button>
+      </nav>
+
+      <main>
+        <!-- Tableau de bord -->
+        <div class="tab-content active" id="dashboard">
+          <div class="dashboard-grid">
+            <div class="card">
+              <h3>
+                <i class="fas fa-info-circle"></i>
+                <span data-i18n="web.dashboard.botInfo">Bot Information</span>
+              </h3>
+              <div id="botInfo">
+                <p>
+                  <strong data-i18n="web.dashboard.channel">Channel:</strong>
+                  <span id="channelName">-</span>
+                </p>
+                <p>
+                  <strong data-i18n="web.dashboard.uptime">Uptime:</strong>
+                  <span id="uptime">-</span>
+                </p>
+                <p>
+                  <strong data-i18n="web.dashboard.version">Version:</strong>
+                  <span id="version">-</span>
+                </p>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3><i class="fas fa-music"></i> Spotify</h3>
+              <div id="spotifyInfo">
+                <p>
+                  <strong data-i18n="web.integrations.status">Status:</strong>
+                  <span id="spotifyStatus">-</span>
+                </p>
+                <p>
+                  <strong data-i18n="web.integrations.currentSong"
+                    >Current song:</strong
+                  >
+                  <span id="currentSong">-</span>
+                </p>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3><i class="fas fa-video"></i> OBS</h3>
+              <div id="obsInfo">
+                <p>
+                  <strong data-i18n="web.integrations.status">Status:</strong>
+                  <span id="obsStatus">-</span>
+                </p>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3><i class="fas fa-gamepad"></i> Apex Legends</h3>
+              <div id="apexInfo">
+                <p>
+                  <strong data-i18n="web.integrations.api">API:</strong>
+                  <span id="apexStatus">-</span>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>
+              <i class="fas fa-comment"></i>
+              <span data-i18n="web.dashboard.sendMessage">Send a message</span>
+            </h3>
+            <div class="message-form">
+              <input
+                type="text"
+                id="messageInput"
+                placeholder="Your message..."
+              />
+              <button id="sendMessageBtn" data-i18n="web.dashboard.send">
+                Send
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Commandes -->
+        <div class="tab-content" id="commands">
+          <div class="card">
+            <h3>
+              <i class="fas fa-plus"></i>
+              <span data-i18n="web.commands.addCommand">Add a command</span>
+            </h3>
+            <form id="addCommandForm" class="form">
+              <div class="form-group">
+                <label for="commandName" data-i18n="web.commands.commandName"
+                  >Command name:</label
+                >
+                <input
+                  type="text"
+                  id="commandName"
+                  placeholder="name"
+                  required
+                />
+              </div>
+              <div class="form-group">
+                <label for="commandContent" data-i18n="web.commands.content"
+                  >Content:</label
+                >
+                <textarea
+                  id="commandContent"
+                  placeholder="Message to display..."
+                  required
+                ></textarea>
+              </div>
+              <button type="submit" data-i18n="web.common.add">Add</button>
+            </form>
+          </div>
+
+          <div class="card">
+            <h3>
+              <i class="fas fa-list"></i>
+              <span data-i18n="web.commands.existingCommands"
+                >Existing commands</span
+              >
+            </h3>
+            <div class="table-container">
+              <table id="commandsTable">
+                <thead>
+                  <tr>
+                    <th data-i18n="web.commands.command">Command</th>
+                    <th data-i18n="web.commands.content">Content</th>
+                    <th data-i18n="web.commands.usage">Usage</th>
+                    <th data-i18n="web.moderation.addedBy">Added by</th>
+                    <th data-i18n="web.common.actions">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="commandsTableBody">
+                  <!-- Rempli dynamiquement -->
+                </tbody>
+              </table>
+            </div>
+            <button id="refreshCommandsBtn" class="refresh-btn">
+              <i class="fas fa-sync-alt"></i>
+              <span data-i18n="web.common.refresh">Refresh</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Modération -->
+        <div class="tab-content" id="moderation">
+          <div class="card">
+            <div class="card-header">
+              <h3>
+                <i class="fas fa-ban"></i>
+                <span data-i18n="web.moderation.bannedWords">Banned words</span>
+              </h3>
+              <div class="switch-container">
+                <label class="switch">
+                  <input type="checkbox" id="bannedWordsToggle" checked />
+                  <span class="slider round"></span>
+                </label>
+                <span class="switch-label" data-i18n="web.moderation.enabled"
+                  >Enabled</span
+                >
+              </div>
+            </div>
+            <form id="addBannedWordForm" class="form">
+              <div class="form-group">
+                <label for="bannedWord" data-i18n="web.moderation.bannedWord"
+                  >Banned word:</label
+                >
+                <input
+                  type="text"
+                  id="bannedWord"
+                  placeholder="banned_word"
+                  required
+                />
+              </div>
+              <div class="form-group">
+                <label for="bannedWordAction" data-i18n="web.moderation.action"
+                  >Action:</label
+                >
+                <select id="bannedWordAction">
+                  <option value="timeout">Timeout</option>
+                  <option value="delete" data-i18n="web.moderation.delete">
+                    Delete
+                  </option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label
+                  for="bannedWordDuration"
+                  data-i18n="web.moderation.duration"
+                  >Duration (seconds):</label
+                >
+                <input
+                  type="number"
+                  id="bannedWordDuration"
+                  value="300"
+                  min="1"
+                />
+              </div>
+              <button type="submit" data-i18n="web.common.add">Add</button>
+            </form>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3>
+                <i class="fas fa-link"></i>
+                <span data-i18n="web.moderation.allowedLinks"
+                  >Allowed links</span
+                >
+              </h3>
+              <div class="switch-container">
+                <label class="switch">
+                  <input type="checkbox" id="allowedLinksToggle" checked />
+                  <span class="slider round"></span>
+                </label>
+                <span class="switch-label" data-i18n="web.moderation.enabled"
+                  >Enabled</span
+                >
+              </div>
+            </div>
+            <form id="addAllowedLinkForm" class="form">
+              <div class="form-group">
+                <label
+                  for="allowedLink"
+                  data-i18n="web.moderation.allowedDomain"
+                  >Allowed domain:</label
+                >
+                <input
+                  type="text"
+                  id="allowedLink"
+                  placeholder="example.com"
+                  required
+                />
+              </div>
+              <button type="submit" data-i18n="web.common.add">Add</button>
+            </form>
+          </div>
+
+          <div class="card">
+            <h3>
+              <i class="fas fa-list"></i>
+              <span data-i18n="web.moderation.bannedWordsList"
+                >Banned words list</span
+              >
+            </h3>
+            <div class="table-container">
+              <table id="bannedWordsTable">
+                <thead>
+                  <tr>
+                    <th data-i18n="web.moderation.word">Word</th>
+                    <th data-i18n="web.moderation.action">Action</th>
+                    <th data-i18n="web.moderation.duration">Duration</th>
+                    <th data-i18n="web.moderation.addedBy">Added by</th>
+                    <th data-i18n="web.common.actions">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="bannedWordsTableBody">
+                  <!-- Rempli dynamiquement -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>
+              <i class="fas fa-list"></i>
+              <span data-i18n="web.moderation.allowedLinksList"
+                >Allowed links list</span
+              >
+            </h3>
+            <div class="table-container">
+              <table id="allowedLinksTable">
+                <thead>
+                  <tr>
+                    <th data-i18n="web.moderation.domain">Domain</th>
+                    <th data-i18n="web.moderation.addedBy">Added by</th>
+                    <th data-i18n="web.moderation.addedDate">Added date</th>
+                    <th data-i18n="web.common.actions">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="allowedLinksTableBody">
+                  <!-- Rempli dynamiquement -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Messages récurrents -->
+        <div class="tab-content" id="recurring">
+          <div class="recurring-grid">
+            <div class="card">
+              <h3>
+                <i class="fas fa-plus"></i>
+                <span data-i18n="web.recurring.addMessage"
+                  >Add a recurring message</span
+                >
+              </h3>
+              <form id="addRecurringMessageForm" class="form">
+                <div class="form-group">
+                  <label
+                    for="recurringMessage"
+                    data-i18n="web.recurring.message"
+                    >Message:</label
+                  >
+                  <textarea
+                    id="recurringMessage"
+                    placeholder="Enter your message..."
+                    required
+                  ></textarea>
+                </div>
+                <div class="form-group">
+                  <label
+                    for="intervalMinutes"
+                    data-i18n="web.recurring.interval"
+                    >Interval (minutes):</label
+                  >
+                  <input
+                    type="number"
+                    id="intervalMinutes"
+                    placeholder="30"
+                    min="1"
+                    max="1440"
+                    required
+                  />
+                </div>
+                <button type="submit" data-i18n="web.common.add">Add</button>
+              </form>
+            </div>
+
+            <div class="card">
+              <h3>
+                <i class="fas fa-list"></i>
+                <span data-i18n="web.recurring.activeMessages"
+                  >Active recurring messages</span
+                >
+              </h3>
+              <div class="table-container">
+                <table id="recurringMessagesTable">
+                  <thead>
+                    <tr>
+                      <th data-i18n="web.recurring.message">Message</th>
+                      <th data-i18n="web.recurring.interval">Interval</th>
+                      <th data-i18n="web.recurring.status">Status</th>
+                      <th data-i18n="web.recurring.lastSent">Last sent</th>
+                      <th data-i18n="web.common.actions">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="recurringMessagesTableBody">
+                    <!-- Rempli dynamiquement -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Intégrations -->
+        <div class="tab-content" id="integrations">
+          <div class="integrations-grid">
+            <div class="card">
+              <h3><i class="fas fa-music"></i> Spotify</h3>
+              <div id="spotifyControls">
+                <p>
+                  <strong data-i18n="web.integrations.status">Status:</strong>
+                  <span id="spotifyStatusDetail">-</span>
+                </p>
+                <button id="refreshSpotifyBtn" class="action-btn">
+                  <i class="fas fa-sync-alt"></i> Actualiser
+                </button>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3><i class="fas fa-video"></i> OBS</h3>
+              <div id="obsControls">
+                <p>
+                  <strong data-i18n="web.integrations.status">Status:</strong>
+                  <span id="obsStatusDetail">-</span>
+                </p>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3><i class="fas fa-gamepad"></i> Apex Legends</h3>
+              <div id="apexControls">
+                <p>
+                  <strong data-i18n="web.integrations.api">API:</strong>
+                  <span id="apexStatusDetail">-</span>
+                </p>
+                <button id="refreshApexBtn" class="action-btn">
+                  <i class="fas fa-sync-alt"></i> Actualiser
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Notifications -->
+    <div id="notifications" class="notifications"></div>
+
+    <!-- Edit Command Modal -->
+    <div id="editCommandModal" class="modal" style="display: none">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>
+            <i class="fas fa-edit"></i>
+            <span data-i18n="web.commands.editTitle">Edit Command</span>
+          </h3>
+          <button class="modal-close" onclick="closeModal('editCommandModal')">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <form id="editCommandForm" class="modal-form">
+          <div class="form-group">
+            <label for="editCommandName" data-i18n="web.commands.command"
+              >Command:</label
+            >
+            <input type="text" id="editCommandName" required />
+          </div>
+          <div class="form-group">
+            <label for="editCommandContent" data-i18n="web.commands.content"
+              >Content:</label
+            >
+            <textarea id="editCommandContent" required></textarea>
+          </div>
+          <div class="modal-actions">
+            <button
+              type="button"
+              class="btn-secondary"
+              onclick="closeModal('editCommandModal')"
+              data-i18n="web.common.cancel"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              class="btn-primary"
+              data-i18n="web.common.save"
+            >
+              Save
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Edit Banned Word Modal -->
+    <div id="editBannedWordModal" class="modal" style="display: none">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>
+            <i class="fas fa-edit"></i>
+            <span data-i18n="web.moderation.editBannedWordTitle"
+              >Edit Banned Word</span
+            >
+          </h3>
+          <button
+            class="modal-close"
+            onclick="closeModal('editBannedWordModal')"
+          >
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <form id="editBannedWordForm" class="modal-form">
+          <div class="form-group">
+            <label for="editBannedWordText" data-i18n="web.moderation.word"
+              >Word:</label
+            >
+            <input type="text" id="editBannedWordText" required />
+          </div>
+          <div class="form-group">
+            <label for="editBannedWordAction" data-i18n="web.moderation.action"
+              >Action:</label
+            >
+            <select id="editBannedWordAction" required>
+              <option value="timeout">Timeout</option>
+              <option value="delete">Delete</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label
+              for="editBannedWordDuration"
+              data-i18n="web.moderation.duration"
+              >Duration (seconds):</label
+            >
+            <input type="number" id="editBannedWordDuration" min="1" required />
+          </div>
+          <div class="modal-actions">
+            <button
+              type="button"
+              class="btn-secondary"
+              onclick="closeModal('editBannedWordModal')"
+              data-i18n="web.common.cancel"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              class="btn-primary"
+              data-i18n="web.common.save"
+            >
+              Save
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteConfirmModal" class="modal" style="display: none">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>
+            <i class="fas fa-exclamation-triangle"></i>
+            <span data-i18n="web.common.confirmDelete">Confirm Delete</span>
+          </h3>
+          <button
+            class="modal-close"
+            onclick="closeModal('deleteConfirmModal')"
+          >
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <p id="deleteConfirmMessage"></p>
+        </div>
+        <div class="modal-actions">
+          <button
+            type="button"
+            class="btn-secondary"
+            onclick="closeModal('deleteConfirmModal')"
+            data-i18n="web.common.cancel"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="btn-danger"
+            id="deleteConfirmBtn"
+            data-i18n="web.common.delete"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
