@@ -116,4 +116,7 @@ sounds/
 
 # Backup files
 *.bak
-*.backup 
+*.backup
+
+# pem files
+*.pem
