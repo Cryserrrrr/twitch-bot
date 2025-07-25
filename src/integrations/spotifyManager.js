@@ -24,10 +24,13 @@ class SpotifyManager {
         await this.refreshAccessToken();
         this.startTrackUpdate();
       } else {
-        console.log(this.translator.t("spotify.tokenNotConfigured"));
+        console.log(this.translator.t("web.spotify.tokenNotConfigured"));
       }
     } catch (error) {
-      console.error(this.translator.t("spotify.errorInitialization"), error);
+      console.error(
+        this.translator.t("web.spotify.errorInitialization"),
+        error
+      );
     }
   }
 
@@ -42,14 +45,17 @@ class SpotifyManager {
         this.refreshAccessToken();
       }, 3500000); // 58 minutes
     } catch (error) {
-      console.error(this.translator.t("spotify.errorRefreshingToken"), error);
+      console.error(
+        this.translator.t("web.spotify.errorRefreshingToken"),
+        error
+      );
       this.isAuthenticated = false;
     }
   }
 
   async getCurrentSong() {
     if (!this.isAuthenticated) {
-      return this.translator.t("spotify.notConnected");
+      return this.translator.t("web.spotify.notConnected");
     }
 
     try {

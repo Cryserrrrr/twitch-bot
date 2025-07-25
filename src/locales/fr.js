@@ -375,6 +375,42 @@ module.exports = {
       currentSong: "Chanson actuelle :",
       noSong: "Aucune chanson en cours",
       configured: "Configuré dans .env",
+      spotifyAuth: {
+        title: "Autorisation Spotify",
+        step1:
+          "Obtenez l'URL d'autorisation et ouvrez-la dans votre navigateur",
+        step2:
+          "Après autorisation, copiez le code d'autorisation depuis l'URL de redirection",
+        step3:
+          "Collez le code d'autorisation ci-dessous pour obtenir votre refresh token",
+        autoStep1:
+          "Cliquez sur le bouton ci-dessous pour obtenir l'URL d'autorisation",
+        autoStep2:
+          "Après autorisation, votre refresh token sera automatiquement ajouté à votre fichier .env",
+        autoNote:
+          "Le processus est maintenant entièrement automatisé - aucune copie manuelle requise !",
+        getAuthUrl: "Obtenir l'URL d'autorisation",
+        openInBrowser: "Ouvrir dans le navigateur",
+        getRefreshToken: "Obtenir le Refresh Token",
+        copyToken: "Copier",
+        authCodePlaceholder: "Collez le code d'autorisation ici...",
+        refreshTokenLabel: "Refresh Token :",
+        redirectUrlNote: "L'URL de redirection ressemblera à :",
+        redirectUrlExample:
+          "https://127.0.0.1:3000/callback/spotify?code=XXXXX",
+        authUrlGenerated: "URL d'autorisation générée avec succès !",
+        authPageOpened: "Page d'autorisation ouverte dans un nouvel onglet",
+        tokenGenerated:
+          "Autorisation réussie ! Copiez le refresh token dans votre fichier .env.",
+        tokenCopied: "Refresh token copié dans le presse-papiers !",
+        errors: {
+          generateUrl: "Erreur lors de la génération de l'URL d'autorisation",
+          exchangeCode: "Erreur lors de l'échange du code d'autorisation",
+          noAuthCode: "Veuillez entrer le code d'autorisation",
+          noTokenToCopy: "Aucun refresh token à copier",
+          generateUrlFirst: "Veuillez d'abord générer l'URL d'autorisation",
+        },
+      },
     },
     common: {
       add: "Ajouter",
@@ -550,6 +586,21 @@ module.exports = {
         setupInstructions:
           "Si le script de setup n'est plus en cours, relancez-le avec : npm run setup",
         returnToInterface: "Retour à l'interface",
+        // Nouveaux messages de callback automatique
+        autoSuccessMessage:
+          "Votre refresh token Spotify a été automatiquement ajouté à votre fichier .env !",
+        refreshTokenAdded: "Refresh token ajouté au .env :",
+        refreshTokenLabel: "Refresh Token :",
+        copyToken: "Copier le Token",
+        tokenCopied: "Copié !",
+        restartRequired:
+          "Veuillez redémarrer le bot pour que les changements prennent effet.",
+        exchangeError: "Erreur d'échange de token",
+        exchangeErrorMessage:
+          "Échec de l'échange du code d'autorisation contre un refresh token. Veuillez réessayer.",
+        externalEnvWarning: "Gestion d'environnement externe",
+        externalEnvMessage:
+          "Si votre fichier .env est géré à l'extérieur (ex: Coolify, Docker, ou serveur distant avec variables d'environnement), vous devez manuellement ajouter ce refresh token à votre configuration d'environnement.",
       },
     },
     ads: {

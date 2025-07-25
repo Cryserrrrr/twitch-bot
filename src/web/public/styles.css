@@ -1116,3 +1116,146 @@ button:disabled:hover {
   transform: none !important;
   box-shadow: none !important;
 }
+
+/* Spotify Authorization Styles */
+.spotify-auth-section {
+  margin-top: 20px;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 10px;
+  border-left: 4px solid #1db954;
+}
+
+.spotify-auth-section h4 {
+  color: #1db954;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.auth-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 15px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  background: #1db954;
+  color: white;
+  border-radius: 50%;
+  font-weight: bold;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.step p {
+  margin: 0;
+  color: #495057;
+  line-height: 1.5;
+}
+
+.step .note {
+  font-size: 0.9rem;
+  color: #6c757d;
+  background: #f8f9fa;
+  padding: 10px;
+  border-radius: 5px;
+  border-left: 3px solid #1db954;
+}
+
+.step .note code {
+  background: #e9ecef;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.85rem;
+}
+
+#spotifyAuthUrlContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+#spotifyAuthUrl {
+  padding: 10px;
+  border: 1px solid #ced4da;
+  border-radius: 5px;
+  font-family: monospace;
+  font-size: 0.9rem;
+  background: #f8f9fa;
+}
+
+.auth-code-input {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+#spotifyAuthCode {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid #ced4da;
+  border-radius: 5px;
+  font-family: monospace;
+}
+
+#spotifyTokenContainer {
+  margin-top: 15px;
+  padding: 15px;
+  background: #e8f5e8;
+  border-radius: 8px;
+  border: 1px solid #1db954;
+}
+
+#spotifyTokenContainer label {
+  display: block;
+  font-weight: bold;
+  color: #1db954;
+  margin-bottom: 8px;
+}
+
+#spotifyRefreshToken {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #1db954;
+  border-radius: 5px;
+  font-family: monospace;
+  font-size: 0.9rem;
+  background: white;
+  margin-bottom: 10px;
+}
+
+/* Responsive design for Spotify auth */
+@media (max-width: 768px) {
+  .auth-code-input {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .step {
+    padding: 12px;
+  }
+
+  .spotify-auth-section {
+    padding: 15px;
+  }
+}

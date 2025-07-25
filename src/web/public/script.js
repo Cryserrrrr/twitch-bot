@@ -1,6 +1,7 @@
 // Variables globales
 let currentTab = "dashboard";
 let refreshInterval;
+let spotifyRefreshInterval; // New interval for Spotify updates
 let sessionId = localStorage.getItem("twitch_session");
 let currentUser = JSON.parse(localStorage.getItem("twitch_user") || "null");
 let currentPermissions = JSON.parse(
@@ -45,6 +46,18 @@ function applyTranslations() {
     const translation = getTranslation(key);
     if (translation) {
       element.textContent = translation;
+    }
+  });
+
+  // Apply placeholders
+  const placeholderElements = document.querySelectorAll(
+    "[data-i18n-placeholder]"
+  );
+  placeholderElements.forEach((element) => {
+    const key = element.getAttribute("data-i18n-placeholder");
+    const translation = getTranslation(key);
+    if (translation) {
+      element.placeholder = translation;
     }
   });
 }
@@ -353,6 +366,9 @@ function initializeEventListeners() {
 
   // Initialize ads event listeners
   initializeAdsEventListeners();
+
+  // Initialize Spotify auth event listeners
+  initializeSpotifyAuthEventListeners();
 }
 
 // Chargement initial des données
@@ -405,13 +421,11 @@ async function apiCall(endpoint, options = {}) {
       : endpoint;
 
     const url = `/api/${cleanEndpoint}`;
-    console.log(`🌐 API Call: ${url}`);
 
     const response = await fetch(url, {
       headers,
       ...options,
     });
-    console.log(response);
 
     if (!response.ok) {
       if (response.status === 401) {
@@ -1237,12 +1251,15 @@ function showNotification(message, type = "info") {
 }
 
 function startAutoRefresh() {
-  // Clear existing interval
+  // Clear existing intervals
   if (refreshInterval) {
     clearInterval(refreshInterval);
   }
+  if (spotifyRefreshInterval) {
+    clearInterval(spotifyRefreshInterval);
+  }
 
-  // Start new interval
+  // Start main refresh interval (every 30 seconds)
   refreshInterval = setInterval(() => {
     if (currentTab === "dashboard") {
       loadBotStatus();
@@ -1250,6 +1267,12 @@ function startAutoRefresh() {
       loadIntegrationsData();
     }
   }, 30000); // Refresh every 30 seconds
+
+  // Start Spotify-specific refresh interval (every 10 seconds)
+  spotifyRefreshInterval = setInterval(() => {
+    // Always update Spotify info, regardless of current tab
+    loadSpotifyInfo();
+  }, 10000); // Refresh Spotify every 10 seconds
 }
 
 // Ads Management Functions
@@ -1433,9 +1456,65 @@ function initializeAdsEventListeners() {
   }
 }
 
+// Initialize Spotify auth event listeners
+function initializeSpotifyAuthEventListeners() {
+  // Get authorization URL button
+  const getSpotifyAuthUrlBtn = document.getElementById("getSpotifyAuthUrlBtn");
+  if (getSpotifyAuthUrlBtn) {
+    getSpotifyAuthUrlBtn.addEventListener("click", getSpotifyAuthUrl);
+  }
+
+  // Open authorization URL button
+  const openSpotifyAuthBtn = document.getElementById("openSpotifyAuthBtn");
+  if (openSpotifyAuthBtn) {
+    openSpotifyAuthBtn.addEventListener("click", openSpotifyAuth);
+  }
+}
+
+// Spotify Authorization Functions
+async function getSpotifyAuthUrl() {
+  try {
+    const response = await apiCall("spotify/auth-url");
+    const authUrlInput = document.getElementById("spotifyAuthUrl");
+    const authUrlContainer = document.getElementById("spotifyAuthUrlContainer");
+
+    authUrlInput.value = response.authUrl;
+    authUrlContainer.style.display = "block";
+
+    showNotification(
+      t("web.integrations.spotifyAuth.authUrlGenerated"),
+      "success"
+    );
+  } catch (error) {
+    console.error("Error getting Spotify auth URL:", error);
+    showNotification(
+      t("web.integrations.spotifyAuth.errors.generateUrl"),
+      "error"
+    );
+  }
+}
+
+function openSpotifyAuth() {
+  const authUrlInput = document.getElementById("spotifyAuthUrl");
+  const authUrl = authUrlInput.value;
+
+  if (authUrl) {
+    window.open(authUrl, "_blank");
+    showNotification(t("web.integrations.spotifyAuth.authPageOpened"), "info");
+  } else {
+    showNotification(
+      t("web.integrations.spotifyAuth.errors.generateUrlFirst"),
+      "error"
+    );
+  }
+}
+
 // Nettoyage lors de la fermeture
 window.addEventListener("beforeunload", () => {
   if (refreshInterval) {
     clearInterval(refreshInterval);
+  }
+  if (spotifyRefreshInterval) {
+    clearInterval(spotifyRefreshInterval);
   }
 });

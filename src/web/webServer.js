@@ -525,6 +525,31 @@ class WebServer {
       });
     });
 
+    // Spotify Authorization
+    this.app.get("/api/spotify/auth-url", (req, res) => {
+      try {
+        const SpotifyWebApi = require("spotify-web-api-node");
+        const spotifyApi = new SpotifyWebApi({
+          clientId: process.env.SPOTIFY_CLIENT_ID,
+          clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+          redirectUri: `${process.env.WEB_URL}:${process.env.WEB_PORT}/callback/spotify`,
+        });
+
+        const scopes = [
+          "user-read-currently-playing",
+          "user-read-playback-state",
+          "user-modify-playback-state",
+          "user-read-private",
+        ];
+
+        const authUrl = spotifyApi.createAuthorizeURL(scopes);
+        res.json({ authUrl });
+      } catch (error) {
+        console.error("Error generating Spotify auth URL:", error);
+        res.status(500).json({ error: "Error generating authorization URL" });
+      }
+    });
+
     // OBS
     this.app.get("/api/obs/status", (req, res) => {
       res.json({
@@ -664,7 +689,7 @@ class WebServer {
     });
 
     // Spotify callback
-    this.app.get("/callback/spotify", (req, res) => {
+    this.app.get("/callback/spotify", async (req, res) => {
       const { code, error } = req.query;
 
       if (error) {
@@ -687,35 +712,145 @@ class WebServer {
       }
 
       if (code) {
-        const t = this.bot.translator.t.bind(this.bot.translator);
-        res.send(`
-          <html>
-            <head><title>${t(
-              "web.callback.spotify.successTitle"
-            )}</title></head>
-            <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px; background: linear-gradient(135deg, #1db954, #191414); color: white;">
-              <div style="background: rgba(255,255,255,0.1); padding: 30px; border-radius: 15px; backdrop-filter: blur(10px);">
-                <h1>🎵 ${t("web.callback.spotify.successTitle")} !</h1>
-                <p>${t("web.callback.spotify.successMessage")}</p>
-                <div style="background: rgba(0,0,0,0.3); padding: 20px; border-radius: 10px; margin: 20px 0; word-break: break-all;">
-                  <strong>${t(
-                    "web.callback.spotify.authorizationCode"
-                  )}</strong><br>
-                  <code style="font-size: 12px;">${code}</code>
+        try {
+          // Exchange the authorization code for a refresh token
+          const SpotifyWebApi = require("spotify-web-api-node");
+          const spotifyApi = new SpotifyWebApi({
+            clientId: process.env.SPOTIFY_CLIENT_ID,
+            clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+            redirectUri: `${process.env.WEB_URL}:${process.env.WEB_PORT}/callback/spotify`,
+          });
+
+          const data = await spotifyApi.authorizationCodeGrant(code);
+          const refreshToken = data.body["refresh_token"];
+
+          // Add the refresh token to the .env file
+          const fs = require("fs");
+          const path = require("path");
+          const envPath = path.join(process.cwd(), ".env");
+
+          let envContent = "";
+          if (fs.existsSync(envPath)) {
+            envContent = fs.readFileSync(envPath, "utf8");
+          }
+
+          // Check if SPOTIFY_REFRESH_TOKEN already exists
+          if (envContent.includes("SPOTIFY_REFRESH_TOKEN=")) {
+            // Update existing token
+            envContent = envContent.replace(
+              /SPOTIFY_REFRESH_TOKEN=.*/g,
+              `SPOTIFY_REFRESH_TOKEN=${refreshToken}`
+            );
+          } else {
+            // Add new token
+            envContent += `\nSPOTIFY_REFRESH_TOKEN=${refreshToken}`;
+          }
+
+          // Write back to .env file
+          fs.writeFileSync(envPath, envContent);
+
+          const t = this.bot.translator.t.bind(this.bot.translator);
+          res.send(`
+            <html>
+              <head><title>${t(
+                "web.callback.spotify.successTitle"
+              )}</title></head>
+              <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <div style="background: rgba(255,255,255,0.1); padding: 30px; border-radius: 15px; backdrop-filter: blur(10px);">
+                  <h1>🎵 ${t("web.callback.spotify.successTitle")} !</h1>
+                  <p>${t("web.callback.spotify.autoSuccessMessage")}</p>
+                  
+                  <!-- Warning for external .env management -->
+                  <div style="background: rgba(255, 193, 7, 0.2); border: 1px solid #ffc107; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 10px;">
+                      <span style="color: #ffc107; font-size: 18px;">⚠️</span>
+                      <strong style="color: #ffc107;">${t(
+                        "web.callback.spotify.externalEnvWarning"
+                      )}</strong>
+                    </div>
+                    <p style="margin: 0; font-size: 14px; color: #fff; text-align: center;">${t(
+                      "web.callback.spotify.externalEnvMessage"
+                    )}</p>
+                  </div>
+                  
+                  <div style="background: rgba(0,0,0,0.3); padding: 20px; border-radius: 10px; margin: 20px 0; word-break: break-all;">
+                    <strong>${t(
+                      "web.callback.spotify.refreshTokenLabel"
+                    )}</strong><br>
+                    <code style="font-size: 12px; background: rgba(255,255,255,0.1); padding: 10px; border-radius: 5px; display: block; margin: 10px 0; word-break: break-all;">${refreshToken}</code>
+                    <button onclick="copyToClipboard('${refreshToken}')" style="background: #1db954; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 12px; margin-top: 10px;">
+                      📋 ${t("web.callback.spotify.copyToken")}
+                    </button>
+                  </div>
+                  
+                  <p><strong>${t(
+                    "web.callback.spotify.restartRequired"
+                  )}</strong></p>
+                  <div style="margin-top: 30px;">
+                    <a href="/" style="background: #1db954; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">${t(
+                      "web.callback.spotify.returnToInterface"
+                    )}</a>
+                  </div>
                 </div>
-                <p><strong>${t("web.callback.spotify.copyCode")}</strong></p>
-                <p style="font-size: 14px; opacity: 0.8;">${t(
-                  "web.callback.spotify.setupInstructions"
-                )}</p>
-                <div style="margin-top: 30px;">
-                  <a href="/" style="background: #1db954; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">${t(
-                    "web.callback.spotify.returnToInterface"
-                  )}</a>
-                </div>
-              </div>
-            </body>
-          </html>
-        `);
+                
+                <script>
+                  function copyToClipboard(text) {
+                    navigator.clipboard.writeText(text).then(() => {
+                      const button = event.target;
+                      const originalText = button.innerHTML;
+                      button.innerHTML = '✅ ${t(
+                        "web.callback.spotify.tokenCopied"
+                      )}';
+                      button.style.background = '#28a745';
+                      setTimeout(() => {
+                        button.innerHTML = originalText;
+                        button.style.background = '#1db954';
+                      }, 2000);
+                    }).catch(() => {
+                      // Fallback for older browsers
+                      const textArea = document.createElement('textarea');
+                      textArea.value = text;
+                      document.body.appendChild(textArea);
+                      textArea.select();
+                      document.execCommand('copy');
+                      document.body.removeChild(textArea);
+                      
+                      const button = event.target;
+                      const originalText = button.innerHTML;
+                      button.innerHTML = '✅ ${t(
+                        "web.callback.spotify.tokenCopied"
+                      )}';
+                      button.style.background = '#28a745';
+                      setTimeout(() => {
+                        button.innerHTML = originalText;
+                        button.style.background = '#1db954';
+                      }, 2000);
+                    });
+                  }
+                </script>
+              </body>
+            </html>
+          `);
+        } catch (error) {
+          console.error("Error exchanging Spotify code:", error);
+          const t = this.bot.translator.t.bind(this.bot.translator);
+          res.send(`
+            <html>
+              <head><title>${t(
+                "web.callback.spotify.errorTitle"
+              )}</title></head>
+              <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+                <h1 style="color: #ff4444;">❌ ${t(
+                  "web.callback.spotify.exchangeError"
+                )}</h1>
+                <p>${t("web.callback.spotify.exchangeErrorMessage")}</p>
+                <p><a href="/" style="color: #1db954;">${t(
+                  "web.callback.spotify.returnToInterface"
+                )}</a></p>
+              </body>
+            </html>
+          `);
+        }
       } else {
         const t = this.bot.translator.t.bind(this.bot.translator);
         res.send(`

@@ -370,6 +370,39 @@ module.exports = {
       currentSong: "Current song:",
       noSong: "No song currently playing",
       configured: "Configured in .env",
+      spotifyAuth: {
+        title: "Spotify Authorization",
+        step1: "Get authorization URL and open it in your browser",
+        step2:
+          "After authorization, copy the authorization code from the redirect URL",
+        step3: "Paste the authorization code below to get your refresh token",
+        autoStep1: "Click the button below to get the authorization URL",
+        autoStep2:
+          "After authorization, your refresh token will be automatically added to your .env file",
+        autoNote:
+          "The process is now fully automated - no manual copying required!",
+        getAuthUrl: "Get Authorization URL",
+        openInBrowser: "Open in Browser",
+        getRefreshToken: "Get Refresh Token",
+        copyToken: "Copy",
+        authCodePlaceholder: "Paste authorization code here...",
+        refreshTokenLabel: "Refresh Token:",
+        redirectUrlNote: "The redirect URL will look like:",
+        redirectUrlExample:
+          "https://127.0.0.1:3000/callback/spotify?code=XXXXX",
+        authUrlGenerated: "Authorization URL generated successfully!",
+        authPageOpened: "Authorization page opened in new tab",
+        tokenGenerated:
+          "Authorization successful! Copy the refresh token to your .env file.",
+        tokenCopied: "Refresh token copied to clipboard!",
+        errors: {
+          generateUrl: "Error generating authorization URL",
+          exchangeCode: "Error exchanging authorization code",
+          noAuthCode: "Please enter the authorization code",
+          noTokenToCopy: "No refresh token to copy",
+          generateUrlFirst: "Please generate the authorization URL first",
+        },
+      },
     },
     common: {
       add: "Add",
@@ -535,6 +568,21 @@ module.exports = {
         setupInstructions:
           "If the setup script is no longer running, restart it with: npm run setup",
         returnToInterface: "Return to interface",
+        // New automatic callback messages
+        autoSuccessMessage:
+          "Your Spotify refresh token has been automatically added to your .env file!",
+        refreshTokenAdded: "Refresh token added to .env:",
+        refreshTokenLabel: "Refresh Token:",
+        copyToken: "Copy Token",
+        tokenCopied: "Copied!",
+        restartRequired:
+          "Please restart the bot for the changes to take effect.",
+        exchangeError: "Token Exchange Error",
+        exchangeErrorMessage:
+          "Failed to exchange authorization code for refresh token. Please try again.",
+        externalEnvWarning: "External Environment Management",
+        externalEnvMessage:
+          "If your .env file is managed externally (e.g., Coolify, Docker, or remote server with environment variables), you need to manually add this refresh token to your environment configuration.",
       },
     },
     ads: {

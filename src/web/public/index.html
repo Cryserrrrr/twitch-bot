@@ -466,6 +466,48 @@
                   <i class="fas fa-sync-alt"></i> Actualiser
                 </button>
               </div>
+
+              <!-- Spotify Authorization Section -->
+              <div class="spotify-auth-section">
+                <h4>
+                  <i class="fas fa-key"></i>
+                  <span data-i18n="web.integrations.spotifyAuth.title"
+                    >Spotify Authorization</span
+                  >
+                </h4>
+                <div class="auth-steps">
+                  <div class="step">
+                    <span class="step-number">1</span>
+                    <p data-i18n="web.integrations.spotifyAuth.autoStep1">
+                      Click the button below to get the authorization URL
+                    </p>
+                    <button id="getSpotifyAuthUrlBtn" class="action-btn">
+                      <i class="fas fa-link"></i>
+                      <span data-i18n="web.integrations.spotifyAuth.getAuthUrl"
+                        >Get Authorization URL</span
+                      >
+                    </button>
+                    <div id="spotifyAuthUrlContainer" style="display: none">
+                      <input type="text" id="spotifyAuthUrl" readonly />
+                      <button id="openSpotifyAuthBtn" class="action-btn">
+                        <i class="fas fa-external-link-alt"></i>
+                        <span
+                          data-i18n="web.integrations.spotifyAuth.openInBrowser"
+                          >Open in Browser</span
+                        >
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="step">
+                    <span class="step-number">2</span>
+                    <p data-i18n="web.integrations.spotifyAuth.autoStep2">
+                      After authorization, your refresh token will be
+                      automatically added to your .env file
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div class="card">
