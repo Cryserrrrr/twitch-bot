@@ -22,7 +22,7 @@ class SetupWizard {
     // Vérifier si .env existe déjà
     if (fs.existsSync(this.envPath)) {
       const answer = await this.question(
-        "Le fichier .env existe déjà. Voulez-vous le remplacer ? (y/N): "
+        "The .env file already exists. Do you want to replace it? (y/N): "
       );
       if (answer.toLowerCase() !== "y") {
         process.exit(0);
@@ -94,25 +94,27 @@ class SetupWizard {
         "Do you want to get the refresh token now? (y/N): "
       );
       if (getToken.toLowerCase() === "y") {
+        const isRemoteServer = await this.question(
+          "Are you running this on a remote server (no GUI)? (y/N): "
+        );
         config.SPOTIFY_REFRESH_TOKEN = await this.getSpotifyToken(
           config.SPOTIFY_CLIENT_ID,
           config.SPOTIFY_CLIENT_SECRET,
-          config.SPOTIFY_REDIRECT_URI
+          config.SPOTIFY_REDIRECT_URI,
+          isRemoteServer.toLowerCase() === "y"
         );
       }
     }
 
-    // Configuration OBS (optionnel)
-    const useOBS = await this.question("Voulez-vous configurer OBS ? (y/N): ");
+    // OBS Configuration (optional)
+    const useOBS = await this.question("Do you want to configure OBS? (y/N): ");
 
     if (useOBS.toLowerCase() === "y") {
       config.OBS_HOST =
-        (await this.question("Hôte OBS (défaut: localhost): ")) || "localhost";
+        (await this.question("OBS Host (default: localhost): ")) || "localhost";
       config.OBS_PORT =
-        (await this.question("Port OBS (défaut: 4455): ")) || "4455";
-      config.OBS_PASSWORD = await this.question(
-        "Mot de passe OBS (optionnel): "
-      );
+        (await this.question("OBS Port (default: 4455): ")) || "4455";
+      config.OBS_PASSWORD = await this.question("OBS Password (optional): ");
     }
 
     // Apex Legends Configuration (optional)
@@ -169,7 +171,12 @@ class SetupWizard {
     });
   }
 
-  async getSpotifyToken(clientId, clientSecret, redirectUri) {
+  async getSpotifyToken(
+    clientId,
+    clientSecret,
+    redirectUri,
+    isRemoteServer = false
+  ) {
     const spotifyApi = new SpotifyWebApi({
       clientId: clientId,
       clientSecret: clientSecret,
@@ -185,24 +192,24 @@ class SetupWizard {
 
     const authUrl = spotifyApi.createAuthorizeURL(scopes);
 
-    // Créer un serveur Express temporaire pour capturer le code d'autorisation
+    // Create a temporary Express server to capture the authorization code
     const app = express();
     let authCode = null;
     let server = null;
 
-    // Route pour capturer le callback Spotify
+    // Route to capture Spotify callback
     app.get("/callback/spotify", (req, res) => {
       const { code, error } = req.query;
 
       if (error) {
         res.send(`
           <html>
-            <head><title>Erreur Spotify</title></head>
+            <head><title>Spotify Error</title></head>
             <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px; background: linear-gradient(135deg, #ff4444, #191414); color: white;">
               <div style="background: rgba(255,255,255,0.1); padding: 30px; border-radius: 15px; backdrop-filter: blur(10px);">
-                <h1>❌ Erreur d'autorisation Spotify</h1>
-                <p>Erreur: ${error}</p>
-                <p>Fermez cette fenêtre et réessayez.</p>
+                <h1>❌ Spotify Authorization Error</h1>
+                <p>Error: ${error}</p>
+                <p>Close this window and try again.</p>
               </div>
             </body>
           </html>
@@ -214,23 +221,23 @@ class SetupWizard {
         authCode = code;
         res.send(`
           <html>
-            <head><title>Autorisation Spotify</title></head>
+            <head><title>Spotify Authorization</title></head>
             <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px; background: linear-gradient(135deg, #1db954, #191414); color: white;">
               <div style="background: rgba(255,255,255,0.1); padding: 30px; border-radius: 15px; backdrop-filter: blur(10px);">
-                <h1>🎵 Autorisation Spotify Réussie !</h1>
-                <p>Votre code d'autorisation a été récupéré avec succès.</p>
+                <h1>🎵 Spotify Authorization Successful!</h1>
+                <p>Your authorization code has been retrieved successfully.</p>
                 <div style="background: rgba(0,0,0,0.3); padding: 20px; border-radius: 10px; margin: 20px 0; word-break: break-all;">
-                  <strong>Code d'autorisation :</strong><br>
+                  <strong>Authorization Code:</strong><br>
                   <code style="font-size: 12px;">${code}</code>
                 </div>
-                <p><strong>Vous pouvez fermer cette fenêtre. Le processus se termine automatiquement.</strong></p>
-                <p style="font-size: 14px; opacity: 0.8;">Le serveur se fermera automatiquement dans quelques secondes...</p>
+                <p><strong>You can close this window. The process will end automatically.</strong></p>
+                <p style="font-size: 14px; opacity: 0.8;">The server will close automatically in a few seconds...</p>
               </div>
             </body>
           </html>
         `);
 
-        // Fermer le serveur après 3 secondes
+        // Close the server after 3 seconds
         setTimeout(() => {
           if (server) {
             server.close();
@@ -239,12 +246,12 @@ class SetupWizard {
       } else {
         res.send(`
           <html>
-            <head><title>Erreur Spotify</title></head>
+            <head><title>Spotify Error</title></head>
             <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px; background: linear-gradient(135deg, #ff4444, #191414); color: white;">
               <div style="background: rgba(255,255,255,0.1); padding: 30px; border-radius: 15px; backdrop-filter: blur(10px);">
-                <h1>❌ Code d'autorisation manquant</h1>
-                <p>Aucun code d'autorisation n'a été reçu.</p>
-                <p>Fermez cette fenêtre et réessayez.</p>
+                <h1>❌ Missing Authorization Code</h1>
+                <p>No authorization code was received.</p>
+                <p>Close this window and try again.</p>
               </div>
             </body>
           </html>
@@ -252,7 +259,7 @@ class SetupWizard {
       }
     });
 
-    // Démarrer le serveur
+    // Start the server
     server = app
       .listen(3000, "127.0.0.1", () => {
         // Server started silently
@@ -263,69 +270,84 @@ class SetupWizard {
             // Server started on port 3001 silently
           });
         } else {
-          console.error(
-            "❌ Erreur lors du démarrage du serveur:",
-            error.message
-          );
+          console.error("❌ Error starting server:", error.message);
         }
       });
 
-    // Ouvrir automatiquement le navigateur
-    await open(authUrl);
+    if (isRemoteServer) {
+      console.log("\n🌐 Remote server mode - Web interface not available");
+      console.log("📋 Please copy and paste this URL in your browser:");
+      console.log(`🔗 ${authUrl}`);
+      console.log(
+        "\n📝 Once authorized, copy the authorization code from the redirect URL"
+      );
+      console.log(
+        "💡 The redirect URL will look like: https://127.0.0.1:3000/callback/spotify?code=XXXXX"
+      );
 
-    // Attendre que le code d'autorisation soit reçu
+      const manualCode = await this.question(
+        "\nSpotify authorization code (from redirect URL): "
+      );
+      if (manualCode) {
+        authCode = manualCode;
+      }
+    } else {
+      // Open browser automatically only in local mode
+      await open(authUrl);
+    }
+
+    // Wait for the authorization code to be received
     return new Promise((resolve) => {
       const checkAuthCode = setInterval(() => {
         if (authCode) {
           clearInterval(checkAuthCode);
 
-          // Fermer le serveur
+          // Close the server
           if (server) {
             server.close(() => {
               // Server closed silently
             });
           }
 
-          // Échanger le code contre un token
+          // Exchange the code for a token
           spotifyApi
             .authorizationCodeGrant(authCode)
             .then((data) => {
               resolve(data.body["refresh_token"]);
             })
             .catch((error) => {
-              console.error(
-                "❌ Erreur lors de l'obtention du token Spotify:",
-                error.message
-              );
+              console.error("❌ Error getting Spotify token:", error.message);
               resolve("");
             });
         }
       }, 1000);
 
-      // Timeout après 5 minutes
-      setTimeout(() => {
-        if (!authCode) {
-          clearInterval(checkAuthCode);
-          if (server) {
-            server.close();
+      // Timeout after 5 minutes (only if not in remote server mode)
+      if (!isRemoteServer) {
+        setTimeout(() => {
+          if (!authCode) {
+            clearInterval(checkAuthCode);
+            if (server) {
+              server.close();
+            }
+            resolve("");
           }
-          resolve("");
-        }
-      }, 300000); // 5 minutes
+        }, 300000); // 5 minutes
+      }
     });
   }
 
   async generateEnvFile(config) {
-    let envContent = "# Configuration générée automatiquement\n\n";
+    let envContent = "# Configuration generated automatically\n\n";
 
-    // Ajouter toutes les variables
+    // Add all variables
     for (const [key, value] of Object.entries(config)) {
       if (value !== undefined && value !== "") {
         envContent += `${key}=${value}\n`;
       }
     }
 
-    // Écrire le fichier
+    // Write the file
     fs.writeFileSync(this.envPath, envContent);
   }
 
@@ -343,9 +365,9 @@ class SetupWizard {
   }
 }
 
-// Démarrer le wizard
+// Start the wizard
 const wizard = new SetupWizard();
 wizard.start().catch((error) => {
-  console.error("❌ Erreur lors de la configuration:", error);
+  console.error("❌ Configuration error:", error);
   process.exit(1);
 });

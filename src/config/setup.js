@@ -59,7 +59,7 @@ class ConfigSetup {
       console.log("6. 💾 Save and quit");
       console.log("7. ❌ Quit without saving");
 
-      const choice = await this.question("\nChoisissez une option (1-7): ");
+      const choice = await this.question("\nChoose an option (1-7): ");
 
       switch (choice) {
         case "1":
@@ -91,17 +91,17 @@ class ConfigSetup {
 
   async configureTwitch(config) {
     config.TWITCH_USERNAME = await this.questionWithDefault(
-      "Nom d'utilisateur Twitch du bot",
+      "Twitch bot username",
       config.TWITCH_USERNAME || ""
     );
 
     config.TWITCH_OAUTH = await this.questionWithDefault(
-      "Token OAuth Twitch (oauth:...)",
+      "Twitch OAuth token (oauth:...)",
       config.TWITCH_OAUTH || ""
     );
 
     config.TWITCH_CHANNEL = await this.questionWithDefault(
-      "Nom du canal Twitch",
+      "Twitch channel name",
       config.TWITCH_CHANNEL || ""
     );
 
@@ -311,17 +311,17 @@ class ConfigSetup {
         authCode = code;
         res.send(`
           <html>
-            <head><title>Autorisation Spotify</title></head>
+            <head><title>Spotify Authorization</title></head>
             <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px; background: linear-gradient(135deg, #1db954, #191414); color: white;">
               <div style="background: rgba(255,255,255,0.1); padding: 30px; border-radius: 15px; backdrop-filter: blur(10px);">
-                <h1>🎵 Autorisation Spotify Réussie !</h1>
-                <p>Votre code d'autorisation a été récupéré avec succès.</p>
+                <h1>🎵 Spotify Authorization Successful!</h1>
+                <p>Your authorization code has been retrieved successfully.</p>
                 <div style="background: rgba(0,0,0,0.3); padding: 20px; border-radius: 10px; margin: 20px 0; word-break: break-all;">
-                  <strong>Code d'autorisation :</strong><br>
+                  <strong>Authorization Code:</strong><br>
                   <code style="font-size: 12px;">${code}</code>
                 </div>
-                <p><strong>Vous pouvez fermer cette fenêtre. Le processus se termine automatiquement.</strong></p>
-                <p style="font-size: 14px; opacity: 0.8;">Le serveur se fermera automatiquement dans quelques secondes...</p>
+                <p><strong>You can close this window. The process will end automatically.</strong></p>
+                <p style="font-size: 14px; opacity: 0.8;">The server will close automatically in a few seconds...</p>
               </div>
             </body>
           </html>
@@ -429,11 +429,11 @@ class ConfigSetup {
 
   async saveConfig(config) {
     // Create .env file content
-    let envContent = "# Configuration du Bot Twitch\n";
-    envContent += "# Généré automatiquement par le script de configuration\n\n";
+    let envContent = "# Twitch Bot Configuration\n";
+    envContent += "# Generated automatically by the configuration script\n\n";
 
     // Add sections with comments
-    envContent += "# === CONFIGURATION TWITCH ===\n";
+    envContent += "# === TWITCH CONFIGURATION ===\n";
     envContent += `TWITCH_USERNAME=${config.TWITCH_USERNAME || ""}\n`;
     envContent += `TWITCH_OAUTH=${config.TWITCH_OAUTH || ""}\n`;
     envContent += `TWITCH_CHANNEL=${config.TWITCH_CHANNEL || ""}\n`;
@@ -444,7 +444,7 @@ class ConfigSetup {
     }\n`;
     envContent += `WEB_AUTH_ENABLED=${config.WEB_AUTH_ENABLED || "false"}\n\n`;
 
-    envContent += "# === CONFIGURATION SPOTIFY ===\n";
+    envContent += "# === SPOTIFY CONFIGURATION ===\n";
     envContent += `SPOTIFY_CLIENT_ID=${config.SPOTIFY_CLIENT_ID || ""}\n`;
     envContent += `SPOTIFY_CLIENT_SECRET=${
       config.SPOTIFY_CLIENT_SECRET || ""
@@ -456,17 +456,17 @@ class ConfigSetup {
       config.SPOTIFY_REFRESH_TOKEN || ""
     }\n\n`;
 
-    envContent += "# === CONFIGURATION APEX LEGENDS ===\n";
+    envContent += "# === APEX LEGENDS CONFIGURATION ===\n";
     envContent += `APEX_PLATFORM=${config.APEX_PLATFORM || "PC"}\n`;
     envContent += `APEX_USERNAME=${config.APEX_USERNAME || ""}\n`;
     envContent += `APEX_API_KEY=${config.APEX_API_KEY || ""}\n\n`;
 
-    envContent += "# === CONFIGURATION OBS ===\n";
+    envContent += "# === OBS CONFIGURATION ===\n";
     envContent += `OBS_HOST=${config.OBS_HOST || "localhost"}\n`;
     envContent += `OBS_PORT=${config.OBS_PORT || "4455"}\n`;
     envContent += `OBS_PASSWORD=${config.OBS_PASSWORD || ""}\n\n`;
 
-    envContent += "# === CONFIGURATION WEB ===\n";
+    envContent += "# === WEB CONFIGURATION ===\n";
     envContent += `WEB_PORT=${config.WEB_PORT || "3000"}\n`;
     envContent += `NODE_ENV=${config.NODE_ENV || "development"}\n\n`;
 
