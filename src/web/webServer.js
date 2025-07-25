@@ -532,7 +532,7 @@ class WebServer {
         const spotifyApi = new SpotifyWebApi({
           clientId: process.env.SPOTIFY_CLIENT_ID,
           clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
-          redirectUri: `${process.env.WEB_URL}:${process.env.WEB_PORT}/callback/spotify`,
+          redirectUri: process.env.SPOTIFY_REDIRECT_URI,
         });
 
         const scopes = [

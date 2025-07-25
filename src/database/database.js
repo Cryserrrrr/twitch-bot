@@ -94,7 +94,6 @@ class Database {
       );
 
       if (allowedLinksCount.count === 0) {
-        console.log(this.translator.t("web.database.insertingDefaultLinks"));
         const defaultAllowedLinks = [
           "twitch.tv",
           "youtube.com",

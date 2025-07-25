@@ -541,7 +541,6 @@ module.exports = {
     },
     database: {
       errorOpening: "Erreur lors de l'ouverture de la base de données",
-      insertingDefaultLinks: "📝 Insertion des liens autorisés par défaut...",
       errorInsertingDefaultData:
         "Erreur lors de l'insertion des données par défaut",
     },

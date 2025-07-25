@@ -523,7 +523,6 @@ module.exports = {
     },
     database: {
       errorOpening: "Error opening database",
-      insertingDefaultLinks: "📝 Inserting default allowed links...",
       errorInsertingDefaultData: "Error inserting default data",
     },
     notifications: {
