@@ -1,4 +1,3 @@
-const Database = require("../database/database");
 const Translator = require("../utils/translator");
 
 class ModerationManager {

@@ -5,7 +5,6 @@ const path = require("path");
 const readline = require("readline");
 const SpotifyWebApi = require("spotify-web-api-node");
 const express = require("express");
-const http = require("http");
 const open = require("open");
 
 const rl = readline.createInterface({
@@ -57,16 +56,17 @@ class SetupWizard {
       console.log("\nTo get your Twitch Auth credentials:");
       console.log("1. Go to https://dev.twitch.tv/console");
       console.log("2. Create a new application");
-      console.log(
-        "3. Add https://127.0.0.1:3000/callback/twitch to Redirect URIs"
-      );
+      console.log("3. Add /callback/twitch to Redirect URIs (localhost:3000)");
       console.log("4. Copy Client ID and Client Secret\n");
 
       config.TWITCH_CLIENT_ID = await this.question("Twitch Client ID: ");
       config.TWITCH_CLIENT_SECRET = await this.question(
         "Twitch Client Secret: "
       );
-      config.TWITCH_REDIRECT_URI = "https://127.0.0.1:3000/callback/twitch";
+      config.TWITCH_REDIRECT_URI =
+        (await this.question(
+          "Twitch Redirect URI (default: https://127.0.0.1:3000/callback/twitch): "
+        )) || "https://127.0.0.1:3000/callback/twitch";
       config.WEB_AUTH_ENABLED = "true";
     }
 
@@ -79,15 +79,16 @@ class SetupWizard {
       console.log("\nTo get your Spotify credentials:");
       console.log("1. Go to https://developer.spotify.com/dashboard");
       console.log("2. Create a new application");
-      console.log(
-        "3. Add https://127.0.0.1:3000/callback/spotify to Redirect URIs"
-      );
+      console.log("3. Add /callback/spotify to Redirect URIs (localhost:3000)");
       console.log("4. Copy Client ID and Client Secret\n");
       config.SPOTIFY_CLIENT_ID = await this.question("Spotify Client ID: ");
       config.SPOTIFY_CLIENT_SECRET = await this.question(
         "Spotify Client Secret: "
       );
-      config.SPOTIFY_REDIRECT_URI = "https://127.0.0.1:3000/callback/spotify";
+      config.SPOTIFY_REDIRECT_URI =
+        (await this.question(
+          "Spotify Redirect URI (default: https://127.0.0.1:3000/callback/spotify): "
+        )) || "https://127.0.0.1:3000/callback/spotify";
 
       const getToken = await this.question(
         "Do you want to get the refresh token now? (y/N): "
@@ -95,7 +96,8 @@ class SetupWizard {
       if (getToken.toLowerCase() === "y") {
         config.SPOTIFY_REFRESH_TOKEN = await this.getSpotifyToken(
           config.SPOTIFY_CLIENT_ID,
-          config.SPOTIFY_CLIENT_SECRET
+          config.SPOTIFY_CLIENT_SECRET,
+          config.SPOTIFY_REDIRECT_URI
         );
       }
     }
@@ -144,6 +146,10 @@ class SetupWizard {
     config.WEB_PORT =
       (await this.question("Web interface port (default: 3000): ")) || "3000";
 
+    config.LANGUAGE =
+      (await this.question("Language (default: en) available: en, fr: ")) ||
+      "en";
+
     // Generate .env file
     await this.generateEnvFile(config);
 
@@ -163,11 +169,11 @@ class SetupWizard {
     });
   }
 
-  async getSpotifyToken(clientId, clientSecret) {
+  async getSpotifyToken(clientId, clientSecret, redirectUri) {
     const spotifyApi = new SpotifyWebApi({
       clientId: clientId,
       clientSecret: clientSecret,
-      redirectUri: "https://127.0.0.1:3000/callback/spotify",
+      redirectUri: redirectUri,
     });
 
     const scopes = [

@@ -582,7 +582,7 @@ module.exports = {
       clientSecret: "Client Secret",
       redirectUri: "Redirect URI",
       instructions:
-        "1. Go to https://developer.spotify.com/dashboard\n2. Create a new application\n3. Add https://127.0.0.1:3000/callback/spotify to Redirect URIs",
+        "1. Go to https://developer.spotify.com/dashboard\n2. Create a new application\n3. Add /callback/spotify to Redirect URIs (localhost:3000)",
     },
     apex: {
       title: "Apex Legends Configuration",

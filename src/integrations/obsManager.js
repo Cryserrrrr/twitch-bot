@@ -1,6 +1,4 @@
 const OBSWebSocket = require("obs-websocket-js").default;
-const fs = require("fs");
-const path = require("path");
 const Translator = require("../utils/translator");
 
 class OBSManager {

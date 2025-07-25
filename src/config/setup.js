@@ -117,9 +117,7 @@ class ConfigSetup {
       console.log("\n📋 Instructions to get your Twitch Auth credentials:");
       console.log("1. Go to https://dev.twitch.tv/console");
       console.log("2. Create a new application");
-      console.log(
-        "3. Add https://127.0.0.1:3000/callback/twitch to Redirect URIs"
-      );
+      console.log("3. Add /callback/twitch to Redirect URIs (localhost:3000)");
       console.log("4. Copy Client ID and Client Secret\n");
 
       config.TWITCH_CLIENT_ID = await this.questionWithDefault(
@@ -260,6 +258,11 @@ class ConfigSetup {
     config.NODE_ENV = await this.questionWithDefault(
       "Environment (development/production, default: development)",
       config.NODE_ENV || "development"
+    );
+
+    config.LANGUAGE = await this.questionWithDefault(
+      "Language (default: en) available: en, fr",
+      config.LANGUAGE || "en"
     );
   }
 

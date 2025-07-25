@@ -38,7 +38,7 @@ npm run setup
 npm start
 ```
 
-### 5. Access web interface
+### 5. Access web interface (localhost)
 
 ```
 https://127.0.0.1:3000 (HTTPS) or http://127.0.0.1:3000 (HTTP)
