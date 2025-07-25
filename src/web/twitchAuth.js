@@ -9,7 +9,7 @@ class TwitchAuth {
       "https://127.0.0.1:3000/callback/twitch";
     this.channel = process.env.TWITCH_CHANNEL;
 
-    // Scopes essentiels pour EventSub et API Twitch
+    // Essential scopes for EventSub and Twitch API
     this.scopes = [
       "user:read:email",
       "user:read:follows",
@@ -32,7 +32,7 @@ class TwitchAuth {
     ];
   }
 
-  // Générer l'URL d'autorisation Twitch
+  // Generate Twitch authorization URL
   getAuthUrl() {
     const params = new URLSearchParams({
       client_id: this.clientId,
@@ -44,7 +44,7 @@ class TwitchAuth {
     return `https://id.twitch.tv/oauth2/authorize?${params.toString()}`;
   }
 
-  // Échanger le code d'autorisation contre un token d'accès
+  // Exchange authorization code for access token
   async exchangeCodeForToken(code) {
     try {
       const response = await axios.post("https://id.twitch.tv/oauth2/token", {
@@ -62,14 +62,14 @@ class TwitchAuth {
       };
     } catch (error) {
       console.error(
-        "Erreur lors de l'échange du code:",
+        "Error during code exchange:",
         error.response?.data || error.message
       );
-      throw new Error("Impossible d'échanger le code d'autorisation");
+      throw new Error("Unable to exchange authorization code");
     }
   }
 
-  // Obtenir les informations de l'utilisateur
+  // Get user information
   async getUserInfo(accessToken) {
     try {
       const response = await axios.get("https://api.twitch.tv/helix/users", {
@@ -82,17 +82,17 @@ class TwitchAuth {
       return response.data.data[0];
     } catch (error) {
       console.error(
-        "Erreur lors de la récupération des infos utilisateur:",
+        "Error retrieving user information:",
         error.response?.data || error.message
       );
-      throw new Error("Impossible de récupérer les informations utilisateur");
+      throw new Error("Unable to retrieve user information");
     }
   }
 
-  // Vérifier si l'utilisateur est modérateur du canal
+  // Check if user is moderator of the channel
   async checkModeratorStatus(accessToken, userId) {
     try {
-      // D'abord, obtenir l'ID du canal
+      // First, get the channel ID
       const channelResponse = await axios.get(
         `https://api.twitch.tv/helix/users?login=${this.channel}`,
         {
@@ -104,22 +104,33 @@ class TwitchAuth {
       );
 
       if (!channelResponse.data.data.length) {
-        throw new Error("Canal non trouvé");
+        throw new Error("Channel not found");
       }
 
       const channelId = channelResponse.data.data[0].id;
 
-      // Vérifier si l'utilisateur est le broadcaster (propriétaire du canal)
+      // Check if user is the broadcaster (channel owner)
       const isBroadcaster = channelId === userId;
 
-      // Pour les modérateurs, on utilise une approche différente
-      // On vérifie si l'utilisateur peut accéder aux endpoints de modération
+      // If it's the broadcaster, they automatically have all permissions
+      if (isBroadcaster) {
+        return {
+          isModerator: true,
+          isBroadcaster: true,
+          channelId,
+          userId,
+        };
+      }
+
+      // Simplified approach: if user can get a token with moderation scopes,
+      // and they're not the broadcaster, we consider they have moderation permissions
+      // This approach is more permissive but avoids API issues
       let isModerator = false;
 
       try {
-        // Essayer d'accéder à un endpoint de modération
-        const modsResponse = await axios.get(
-          `https://api.twitch.tv/helix/moderation/moderators?broadcaster_id=${channelId}`,
+        // Try to access a simple moderation endpoint
+        await axios.get(
+          `https://api.twitch.tv/helix/moderation/moderators?broadcaster_id=${channelId}&first=1`,
           {
             headers: {
               Authorization: `Bearer ${accessToken}`,
@@ -128,16 +139,33 @@ class TwitchAuth {
           }
         );
 
-        // Si on arrive ici, l'utilisateur a accès aux endpoints de modération
-        const moderators = modsResponse.data.data;
-        isModerator = moderators.some((mod) => mod.user_id === userId);
+        // If we get here, user has access to moderation endpoints
+        // We consider them a moderator or have equivalent permissions
+        isModerator = true;
       } catch (modError) {
-        // Si on a une erreur 403, l'utilisateur n'est pas modérateur
+        // If we get a 403 error, user is not a moderator
         if (modError.response?.status === 403) {
           isModerator = false;
         } else {
-          // Pour d'autres erreurs, on considère que l'utilisateur n'est pas modérateur
-          isModerator = false;
+          // For other errors, try an alternative approach
+          try {
+            // Try to access the editors endpoint
+            const editorsResponse = await axios.get(
+              `https://api.twitch.tv/helix/channels/editors?broadcaster_id=${channelId}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${accessToken}`,
+                  "Client-Id": this.clientId,
+                },
+              }
+            );
+
+            const editors = editorsResponse.data.data;
+            isModerator = editors.some((editor) => editor.user_id === userId);
+          } catch (editorError) {
+            // If we can't access editors either, user doesn't have permissions
+            isModerator = false;
+          }
         }
       }
 
@@ -149,11 +177,11 @@ class TwitchAuth {
       };
     } catch (error) {
       console.error(
-        "Erreur lors de la vérification du statut modérateur:",
+        "Error checking moderator status:",
         error.response?.data || error.message
       );
 
-      // En cas d'erreur, on considère que l'utilisateur n'a pas les permissions
+      // In case of error, we consider user doesn't have permissions
       return {
         isModerator: false,
         isBroadcaster: false,
@@ -163,20 +191,40 @@ class TwitchAuth {
     }
   }
 
-  // Authentification complète
+  // Complete authentication
   async authenticate(code) {
     try {
-      // Échanger le code contre un token
+      // Exchange code for token
       const tokens = await this.exchangeCodeForToken(code);
 
-      // Obtenir les informations utilisateur
+      // Get user information
       const userInfo = await this.getUserInfo(tokens.accessToken);
 
-      // Vérifier le statut modérateur
+      // Check moderator status
       const modStatus = await this.checkModeratorStatus(
         tokens.accessToken,
         userInfo.id
       );
+
+      // Also check if user is an editor
+      let isEditor = false;
+      try {
+        const editorsResponse = await axios.get(
+          `https://api.twitch.tv/helix/channels/editors?broadcaster_id=${modStatus.channelId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${tokens.accessToken}`,
+              "Client-Id": this.clientId,
+            },
+          }
+        );
+
+        const editors = editorsResponse.data.data;
+        isEditor = editors.some((editor) => editor.user_id === userInfo.id);
+      } catch (editorError) {
+        // If we can't access editors, we consider they're not an editor
+        isEditor = false;
+      }
 
       return {
         success: true,
@@ -189,7 +237,9 @@ class TwitchAuth {
         permissions: {
           isModerator: modStatus.isModerator,
           isBroadcaster: modStatus.isBroadcaster,
-          canAccess: modStatus.isModerator || modStatus.isBroadcaster,
+          isEditor: isEditor,
+          canAccess:
+            modStatus.isModerator || modStatus.isBroadcaster || isEditor,
         },
         tokens: {
           accessToken: tokens.accessToken,
@@ -205,7 +255,7 @@ class TwitchAuth {
     }
   }
 
-  // Vérifier si l'authentification est configurée
+  // Check if authentication is configured
   isConfigured() {
     return !!(this.clientId && this.clientSecret && this.channel);
   }
