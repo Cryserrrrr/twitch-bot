@@ -59,11 +59,7 @@ class TwitchBot {
 
       // Generate Spotify authorization URL if no refresh token
       if (!process.env.SPOTIFY_REFRESH_TOKEN) {
-        console.log("🔗 Spotify Authorization URL:");
-        console.log(this.spotifyManager.getAuthorizationUrl());
-        console.log(
-          "📝 Copy this URL in your browser to authorize the application"
-        );
+        console.log("Spotify refresh token not found");
       }
 
       this.apexManager = new ApexManager();
@@ -93,7 +89,7 @@ class TwitchBot {
       this.initializeTwitchServices();
 
       console.log("✅ Bot initialized successfully!");
-      console.log("🌐 Web interface available at: https://127.0.0.1:3000");
+      console.log("🌐 Web interface available");
       console.log(
         "🔗 Please login via the web interface to enable EventSub and API features"
       );
