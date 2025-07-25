@@ -5,7 +5,7 @@ class TwitchAuth {
     this.clientId = process.env.TWITCH_CLIENT_ID;
     this.clientSecret = process.env.TWITCH_CLIENT_SECRET;
     this.redirectUri =
-      process.env.TWITCH_REDIRECT_URI ||
+      `https://${process.env.WEB_URL}:${process.env.WEB_PORT}/callback/twitch` ||
       "https://127.0.0.1:3000/callback/twitch";
     this.channel = process.env.TWITCH_CHANNEL;
 
