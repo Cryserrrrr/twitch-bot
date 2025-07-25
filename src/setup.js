@@ -14,8 +14,16 @@ const rl = readline.createInterface({
 
 class SetupWizard {
   constructor() {
-    this.envPath = path.join(__dirname, "../.env");
-    this.envExamplePath = path.join(__dirname, "../env.example");
+    // Use current working directory instead of __dirname for better compatibility with Coolify
+    this.envPath = path.join(process.cwd(), ".env");
+    this.envExamplePath = path.join(process.cwd(), "env.example");
+
+    // Debug logs
+    console.log("🔍 Debug info:");
+    console.log(`Current working directory: ${process.cwd()}`);
+    console.log(`__dirname: ${__dirname}`);
+    console.log(`Env file path: ${this.envPath}`);
+    console.log(`Env example path: ${this.envExamplePath}`);
   }
 
   async start() {
@@ -342,6 +350,9 @@ class SetupWizard {
   }
 
   async generateEnvFile(config) {
+    console.log("📝 Generating .env file...");
+    console.log(`📁 Target path: ${this.envPath}`);
+
     let envContent = "# Configuration generated automatically\n\n";
 
     // Add all variables
@@ -351,19 +362,43 @@ class SetupWizard {
       }
     }
 
-    // Write the file
-    fs.writeFileSync(this.envPath, envContent);
+    console.log("📄 Generated content:");
+    console.log(envContent);
+
+    try {
+      // Write the file
+      fs.writeFileSync(this.envPath, envContent);
+      console.log("✅ .env file written successfully");
+
+      // Verify the file was created
+      if (fs.existsSync(this.envPath)) {
+        console.log("✅ .env file exists after writing");
+        const stats = fs.statSync(this.envPath);
+        console.log(`📊 File size: ${stats.size} bytes`);
+      } else {
+        console.log("❌ .env file does not exist after writing");
+      }
+    } catch (error) {
+      console.error("❌ Error writing .env file:", error);
+      throw error;
+    }
   }
 
   async createDirectories(config) {
-    const dirs = [
-      path.join(__dirname, "../data"),
-      path.join(__dirname, "../sounds"),
-    ];
+    const dirs = [path.join(process.cwd(), "data")];
 
+    console.log("📁 Creating directories...");
     for (const dir of dirs) {
+      console.log(`📂 Creating directory: ${dir}`);
       if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
+        try {
+          fs.mkdirSync(dir, { recursive: true });
+          console.log(`✅ Directory created: ${dir}`);
+        } catch (error) {
+          console.error(`❌ Error creating directory ${dir}:`, error);
+        }
+      } else {
+        console.log(`✅ Directory already exists: ${dir}`);
       }
     }
   }
