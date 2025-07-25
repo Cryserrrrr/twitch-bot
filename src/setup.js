@@ -70,14 +70,20 @@ class SetupWizard {
       console.log("\nTo get your Twitch Auth credentials:");
       console.log("1. Go to https://dev.twitch.tv/console");
       console.log("2. Create a new application");
-      console.log(`3. Add ${config.WEB_URL}/callback/twitch to Redirect URIs`);
+      console.log("3. Add your redirect URI to Redirect URIs");
       console.log("4. Copy Client ID and Client Secret\n");
 
       config.TWITCH_CLIENT_ID = await this.question("Twitch Client ID: ");
       config.TWITCH_CLIENT_SECRET = await this.question(
         "Twitch Client Secret: "
       );
-      config.TWITCH_REDIRECT_URI = `${config.WEB_URL}/callback/twitch`;
+
+      // Ask for Twitch redirect URI separately
+      config.TWITCH_REDIRECT_URI =
+        (await this.question(
+          "Twitch Redirect URI (default: https://127.0.0.1:3000/callback/twitch): "
+        )) || "https://127.0.0.1:3000/callback/twitch";
+
       config.WEB_AUTH_ENABLED = "true";
     }
 
@@ -90,13 +96,18 @@ class SetupWizard {
       console.log("\nTo get your Spotify credentials:");
       console.log("1. Go to https://developer.spotify.com/dashboard");
       console.log("2. Create a new application");
-      console.log(`3. Add ${config.WEB_URL}/callback/spotify to Redirect URIs`);
+      console.log("3. Add your redirect URI to Redirect URIs");
       console.log("4. Copy Client ID and Client Secret\n");
       config.SPOTIFY_CLIENT_ID = await this.question("Spotify Client ID: ");
       config.SPOTIFY_CLIENT_SECRET = await this.question(
         "Spotify Client Secret: "
       );
-      config.SPOTIFY_REDIRECT_URI = `${config.WEB_URL}/callback/spotify`;
+
+      // Ask for Spotify redirect URI separately
+      config.SPOTIFY_REDIRECT_URI =
+        (await this.question(
+          "Spotify Redirect URI (default: https://127.0.0.1:3000/callback/spotify): "
+        )) || "https://127.0.0.1:3000/callback/spotify";
 
       const getToken = await this.question(
         "Do you want to get the refresh token now? (y/N): "

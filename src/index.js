@@ -89,9 +89,7 @@ class TwitchBot {
       this.initializeTwitchServices();
 
       console.log("✅ Bot initialized successfully!");
-      console.log(
-        `🌐 Web interface available at ${process.env.WEB_URL}:${process.env.WEB_PORT}`
-      );
+      console.log(`🌐 Web interface is up and running`);
       console.log(
         "🔗 Please login via the web interface to enable EventSub and API features"
       );
