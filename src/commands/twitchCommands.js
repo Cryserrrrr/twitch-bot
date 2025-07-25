@@ -261,18 +261,44 @@ class TwitchCommands {
 
   async changeCategoryWithApi(categoryName) {
     try {
-      if (!this.apiManager) {
-        throw new Error("TwitchApiManager not available");
+      if (!this.twitchApiManager) {
+        throw new Error("Twitch API Manager not available");
       }
 
-      const result = await this.apiManager.changeStreamCategory(categoryName);
-
-      if (result.success) {
-        return result.categoryName;
-      } else {
-        throw new Error("Failed to change stream category");
-      }
+      const result = await this.twitchApiManager.changeStreamCategory(
+        categoryName
+      );
+      return result;
     } catch (error) {
+      console.error("Error changing category with API:", error.message);
+      throw error;
+    }
+  }
+
+  async startCommercial(length = 30) {
+    try {
+      if (!this.twitchApiManager) {
+        throw new Error("Twitch API Manager not available");
+      }
+
+      const result = await this.twitchApiManager.startCommercial(length);
+      return result;
+    } catch (error) {
+      console.error("Error starting commercial:", error.message);
+      throw error;
+    }
+  }
+
+  async snoozeNextAd() {
+    try {
+      if (!this.twitchApiManager) {
+        throw new Error("Twitch API Manager not available");
+      }
+
+      const result = await this.twitchApiManager.snoozeNextAd();
+      return result;
+    } catch (error) {
+      console.error("Error snoozing next ad:", error.message);
       throw error;
     }
   }

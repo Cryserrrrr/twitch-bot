@@ -534,6 +534,160 @@ class TwitchApiManager {
       return false;
     }
   }
+
+  // Commercial/Ads Management
+  async startCommercial(length = 30) {
+    try {
+      const token = await this.getAccessToken();
+      const response = await axios.post(
+        `https://api.twitch.tv/helix/channels/commercial`,
+        {
+          broadcaster_id: this.broadcasterId,
+          length: length,
+        },
+        {
+          headers: {
+            "Client-ID": this.clientId,
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      return {
+        success: true,
+        data: response.data.data[0],
+        message: `Commercial started successfully for ${length} seconds`,
+      };
+    } catch (error) {
+      console.error(
+        "Error starting commercial:",
+        error.response?.data || error.message
+      );
+      throw new Error("Failed to start commercial");
+    }
+  }
+
+  async getCommercialStatus() {
+    try {
+      const token = await this.getAccessToken();
+      const response = await axios.get(
+        `https://api.twitch.tv/helix/channels/commercial?broadcaster_id=${this.broadcasterId}`,
+        {
+          headers: {
+            "Client-ID": this.clientId,
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      return response.data.data[0] || null;
+    } catch (error) {
+      if (error.response?.status === 404) {
+        // Account doesn't have access to commercial management
+        return {
+          error: "no_access",
+          message: "Commercial management not available for this account",
+        };
+      }
+      console.error(
+        "Error getting commercial status:",
+        error.response?.data || error.message
+      );
+      throw new Error("Failed to get commercial status");
+    }
+  }
+
+  async getAdSchedule() {
+    try {
+      const token = await this.getAccessToken();
+      const response = await axios.get(
+        `https://api.twitch.tv/helix/channels/ads?broadcaster_id=${this.broadcasterId}`,
+        {
+          headers: {
+            "Client-ID": this.clientId,
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      return response.data.data[0] || null;
+    } catch (error) {
+      if (error.response?.status === 404) {
+        // Account doesn't have access to ad management
+        return {
+          error: "no_access",
+          message: "Ad management not available for this account",
+        };
+      }
+      console.error(
+        "Error getting ad schedule:",
+        error.response?.data || error.message
+      );
+      throw new Error("Failed to get ad schedule");
+    }
+  }
+
+  async snoozeNextAd() {
+    try {
+      const token = await this.getAccessToken();
+      const response = await axios.post(
+        `https://api.twitch.tv/helix/channels/ads/schedule/snooze`,
+        {
+          broadcaster_id: this.broadcasterId,
+        },
+        {
+          headers: {
+            "Client-ID": this.clientId,
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      return {
+        success: true,
+        data: response.data.data[0],
+        message: "Next ad has been snoozed successfully",
+      };
+    } catch (error) {
+      console.error(
+        "Error snoozing next ad:",
+        error.response?.data || error.message
+      );
+      throw new Error("Failed to snooze next ad");
+    }
+  }
+
+  async getAdBreakSchedule() {
+    try {
+      const token = await this.getAccessToken();
+      const response = await axios.get(
+        `https://api.twitch.tv/helix/channels/ads/schedule?broadcaster_id=${this.broadcasterId}`,
+        {
+          headers: {
+            "Client-ID": this.clientId,
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      return response.data.data[0] || null;
+    } catch (error) {
+      if (error.response?.status === 404) {
+        // Account doesn't have access to ad break management
+        return {
+          error: "no_access",
+          message: "Ad break management not available for this account",
+        };
+      }
+      console.error(
+        "Error getting ad break schedule:",
+        error.response?.data || error.message
+      );
+      throw new Error("Failed to get ad break schedule");
+    }
+  }
 }
 
 module.exports = TwitchApiManager;

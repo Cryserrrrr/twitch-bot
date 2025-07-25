@@ -10,7 +10,7 @@ module.exports = {
     ping: "Pong! 🏓",
     help: "Commandes disponibles: !ping, !dice, !flip, !song, !request, !apexrank",
     moderatorCommands:
-      " | Modérateur: !addcom, !delcom, !title, !category, !timeout, !ban, !unban",
+      " | Modérateur: !addcom, !delcom, !title, !category, !timeout, !ban, !unban, !delete, !commercial, !snooze",
     streamerCommands: " | Streamer:",
     customCommands: " | Commandes personnalisées:",
     nextSteps: "Prochaines étapes:",
@@ -85,6 +85,27 @@ module.exports = {
       success: "Débannissement exécuté: {username}",
       error:
         "Erreur lors de l'exécution du débannissement pour {username}: {error}",
+    },
+    delete: {
+      usage: "Usage: !delete <utilisateur> (Modérateurs uniquement)",
+      success: "Message supprimé pour {username}",
+      error:
+        "Erreur lors de la suppression du message pour {username}: {error}",
+    },
+    commercial: {
+      usage:
+        "Usage: !commercial [durée] (Modérateurs uniquement, 30-180 secondes)",
+      success: "Publicité démarrée avec succès pour {length} secondes",
+      error:
+        "Échec du démarrage de la publicité. Veuillez vous authentifier via l'interface web d'abord.",
+      invalidLength:
+        "Durée invalide. Veuillez fournir un nombre entre 30 et 180 secondes.",
+    },
+    snooze: {
+      usage: "Usage: !snooze (Modérateurs uniquement)",
+      success: "La prochaine publicité a été reportée avec succès",
+      error:
+        "Échec du report de la prochaine publicité. Veuillez vous authentifier via l'interface web d'abord.",
     },
   },
 
@@ -204,6 +225,7 @@ module.exports = {
       moderation: "Modération",
       recurring: "Messages récurrents",
       integrations: "Intégrations",
+      ads: "Gestion des Publicités",
     },
     dashboard: {
       botInfo: "Informations du Bot",
@@ -529,6 +551,27 @@ module.exports = {
           "Si le script de setup n'est plus en cours, relancez-le avec : npm run setup",
         returnToInterface: "Retour à l'interface",
       },
+    },
+    ads: {
+      status: "Statut des Publicités",
+      controls: "Contrôles des Publicités",
+      history: "Historique des Publicités",
+      commercialLength: "Durée de la publicité (secondes)",
+      startCommercial: "Démarrer une Publicité",
+      snoozeNextAd: "Reporter la Prochaine Publicité",
+      refreshStatus: "Actualiser le Statut",
+      commercialActive: "Publicité Active",
+      noActiveCommercial: "Aucune Publicité Active",
+      nextAdIn: "Prochaine publicité dans {minutes} minutes",
+      noScheduledAds: "Aucune Publicité Programmée",
+      nextBreakIn: "Prochaine pause dans {minutes} minutes",
+      noScheduledBreaks: "Aucune Pause Programmée",
+      commercialStarted:
+        "Publicité démarrée avec succès pour {seconds} secondes",
+      commercialFailed: "Échec du démarrage de la publicité",
+      adSnoozed: "La prochaine publicité a été reportée avec succès",
+      adSnoozeFailed: "Échec du report de la prochaine publicité",
+      noRecentActivity: "Aucune activité récente",
     },
   },
 

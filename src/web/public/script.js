@@ -350,6 +350,9 @@ function initializeEventListeners() {
       closeModal(e.target.id);
     }
   });
+
+  // Initialize ads event listeners
+  initializeAdsEventListeners();
 }
 
 // Chargement initial des données
@@ -376,6 +379,9 @@ function loadTabData(tabName) {
       break;
     case "integrations":
       loadIntegrationsData();
+      break;
+    case "ads":
+      loadAdsData();
       break;
   }
 }
@@ -1231,15 +1237,200 @@ function showNotification(message, type = "info") {
 }
 
 function startAutoRefresh() {
-  // Rafraîchir les données toutes les 30 secondes
+  // Clear existing interval
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+  }
+
+  // Start new interval
   refreshInterval = setInterval(() => {
     if (currentTab === "dashboard") {
       loadBotStatus();
-      loadSpotifyInfo();
-      loadObsInfo();
-      loadApexInfo();
+    } else if (currentTab === "integrations") {
+      loadIntegrationsData();
     }
-  }, 30000);
+  }, 30000); // Refresh every 30 seconds
+}
+
+// Ads Management Functions
+async function loadAdsData() {
+  try {
+    const adsStatus = await apiCall("ads/status");
+    updateAdsStatus(adsStatus);
+  } catch (error) {
+    console.error("Error loading ads data:", error);
+    showNotification("Error loading ads status", "error");
+  }
+}
+
+function updateAdsStatus(data) {
+  // Check if account has access to ads management
+  if (data.commercial && data.commercial.error === "no_access") {
+    // Account doesn't have access
+    const commercialStatus = document.getElementById("commercialStatus");
+    const adScheduleStatus = document.getElementById("adScheduleStatus");
+    const nextAdBreakStatus = document.getElementById("nextAdBreakStatus");
+    const adsInfo = document.getElementById("adsInfo");
+
+    commercialStatus.textContent = "Not available for this account";
+    commercialStatus.className = "status-value inactive";
+
+    adScheduleStatus.textContent = "Not available for this account";
+    adScheduleStatus.className = "status-value inactive";
+
+    nextAdBreakStatus.textContent = "Not available for this account";
+    nextAdBreakStatus.className = "status-value inactive";
+
+    // Show info message
+    if (adsInfo) adsInfo.style.display = "block";
+
+    // Disable buttons
+    const startCommercialBtn = document.getElementById("startCommercialBtn");
+    const snoozeAdBtn = document.getElementById("snoozeAdBtn");
+    if (startCommercialBtn) startCommercialBtn.disabled = true;
+    if (snoozeAdBtn) snoozeAdBtn.disabled = true;
+
+    return;
+  }
+
+  // Hide info message if it was shown
+  const adsInfo = document.getElementById("adsInfo");
+  if (adsInfo) adsInfo.style.display = "none";
+
+  // Update commercial status
+  const commercialStatus = document.getElementById("commercialStatus");
+  if (data.commercial && !data.commercial.error) {
+    commercialStatus.textContent = `Active - ${data.commercial.length}s remaining`;
+    commercialStatus.className = "status-value active";
+  } else {
+    commercialStatus.textContent = "No active commercial";
+    commercialStatus.className = "status-value inactive";
+  }
+
+  // Update ad schedule status
+  const adScheduleStatus = document.getElementById("adScheduleStatus");
+  if (data.adSchedule && !data.adSchedule.error) {
+    const nextAd = new Date(data.adSchedule.next_ad_at);
+    const timeUntilAd = Math.max(
+      0,
+      Math.floor((nextAd - new Date()) / 1000 / 60)
+    );
+    adScheduleStatus.textContent = `Next ad in ${timeUntilAd} minutes`;
+    adScheduleStatus.className = "status-value active";
+  } else {
+    adScheduleStatus.textContent = "No scheduled ads";
+    adScheduleStatus.className = "status-value inactive";
+  }
+
+  // Update ad break schedule status
+  const nextAdBreakStatus = document.getElementById("nextAdBreakStatus");
+  if (data.adBreakSchedule && !data.adBreakSchedule.error) {
+    const nextBreak = new Date(data.adBreakSchedule.next_ad_at);
+    const timeUntilBreak = Math.max(
+      0,
+      Math.floor((nextBreak - new Date()) / 1000 / 60)
+    );
+    nextAdBreakStatus.textContent = `Next break in ${timeUntilBreak} minutes`;
+    nextAdBreakStatus.className = "status-value active";
+  } else {
+    nextAdBreakStatus.textContent = "No scheduled ad breaks";
+    nextAdBreakStatus.className = "status-value inactive";
+  }
+}
+
+async function startCommercial() {
+  const length = document.getElementById("commercialLength").value;
+
+  try {
+    const result = await apiCall("ads/commercial", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ length: parseInt(length) }),
+    });
+
+    if (result.success) {
+      showNotification(
+        `Commercial started successfully for ${length} seconds`,
+        "success"
+      );
+      addToAdsHistory("Commercial started", `${length}s`, "success");
+      loadAdsData(); // Refresh status
+    } else {
+      showNotification("Failed to start commercial", "error");
+    }
+  } catch (error) {
+    console.error("Error starting commercial:", error);
+    showNotification("Error starting commercial", "error");
+    addToAdsHistory("Commercial failed", "Error", "error");
+  }
+}
+
+async function snoozeNextAd() {
+  try {
+    const result = await apiCall("ads/snooze", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (result.success) {
+      showNotification("Next ad has been snoozed successfully", "success");
+      addToAdsHistory("Ad snoozed", "Next ad delayed", "warning");
+      loadAdsData(); // Refresh status
+    } else {
+      showNotification("Failed to snooze next ad", "error");
+    }
+  } catch (error) {
+    console.error("Error snoozing next ad:", error);
+    showNotification("Error snoozing next ad", "error");
+    addToAdsHistory("Ad snooze failed", "Error", "error");
+  }
+}
+
+function addToAdsHistory(action, details, type = "info") {
+  const adsHistory = document.getElementById("adsHistory");
+  const now = new Date();
+  const timeString = now.toLocaleTimeString();
+
+  const historyItem = document.createElement("div");
+  historyItem.className = "history-item";
+  historyItem.innerHTML = `
+    <span class="history-time">${timeString}</span>
+    <span class="history-action ${type}">${action}: ${details}</span>
+  `;
+
+  // Add to the beginning of the history
+  adsHistory.insertBefore(historyItem, adsHistory.firstChild);
+
+  // Keep only the last 10 items
+  const items = adsHistory.querySelectorAll(".history-item");
+  if (items.length > 10) {
+    items[items.length - 1].remove();
+  }
+}
+
+// Initialize ads event listeners
+function initializeAdsEventListeners() {
+  // Refresh ads status button
+  const refreshAdsStatusBtn = document.getElementById("refreshAdsStatusBtn");
+  if (refreshAdsStatusBtn) {
+    refreshAdsStatusBtn.addEventListener("click", loadAdsData);
+  }
+
+  // Start commercial button
+  const startCommercialBtn = document.getElementById("startCommercialBtn");
+  if (startCommercialBtn) {
+    startCommercialBtn.addEventListener("click", startCommercial);
+  }
+
+  // Snooze ad button
+  const snoozeAdBtn = document.getElementById("snoozeAdBtn");
+  if (snoozeAdBtn) {
+    snoozeAdBtn.addEventListener("click", snoozeNextAd);
+  }
 }
 
 // Nettoyage lors de la fermeture

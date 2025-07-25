@@ -621,6 +621,47 @@ class WebServer {
       }
     });
 
+    // Commercial/Ads Management
+    this.app.get("/api/ads/status", async (req, res) => {
+      try {
+        const commercialStatus =
+          await this.bot.twitchApiManager.getCommercialStatus();
+        const adSchedule = await this.bot.twitchApiManager.getAdSchedule();
+        const adBreakSchedule =
+          await this.bot.twitchApiManager.getAdBreakSchedule();
+
+        res.json({
+          commercial: commercialStatus,
+          adSchedule: adSchedule,
+          adBreakSchedule: adBreakSchedule,
+        });
+      } catch (error) {
+        console.error("Error getting ads status:", error);
+        res.status(500).json({ error: "Error retrieving ads status" });
+      }
+    });
+
+    this.app.post("/api/ads/commercial", async (req, res) => {
+      try {
+        const { length = 30 } = req.body;
+        const result = await this.bot.twitchApiManager.startCommercial(length);
+        res.json(result);
+      } catch (error) {
+        console.error("Error starting commercial:", error);
+        res.status(500).json({ error: "Error starting commercial" });
+      }
+    });
+
+    this.app.post("/api/ads/snooze", async (req, res) => {
+      try {
+        const result = await this.bot.twitchApiManager.snoozeNextAd();
+        res.json(result);
+      } catch (error) {
+        console.error("Error snoozing next ad:", error);
+        res.status(500).json({ error: "Error snoozing next ad" });
+      }
+    });
+
     // Spotify callback
     this.app.get("/callback/spotify", (req, res) => {
       const { code, error } = req.query;

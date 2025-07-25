@@ -90,6 +90,10 @@
           <i class="fas fa-plug"></i>
           <span data-i18n="web.tabs.integrations">Integrations</span>
         </button>
+        <button class="tab-btn" data-tab="ads">
+          <i class="fas fa-ad"></i>
+          <span data-i18n="web.tabs.ads">Ads Management</span>
+        </button>
       </nav>
 
       <main>
@@ -484,6 +488,106 @@
                 <button id="refreshApexBtn" class="action-btn">
                   <i class="fas fa-sync-alt"></i> Actualiser
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Gestion des Publicités -->
+        <div class="tab-content" id="ads">
+          <div class="ads-grid">
+            <!-- Statut des Publicités -->
+            <div class="card">
+              <h3>
+                <i class="fas fa-chart-line"></i>
+                <span data-i18n="web.ads.status">Ads Status</span>
+              </h3>
+              <div class="ads-status" id="adsStatus">
+                <div class="status-item">
+                  <span class="status-label">Commercial Status:</span>
+                  <span class="status-value" id="commercialStatus"
+                    >Loading...</span
+                  >
+                </div>
+                <div class="status-item">
+                  <span class="status-label">Ad Schedule:</span>
+                  <span class="status-value" id="adScheduleStatus"
+                    >Loading...</span
+                  >
+                </div>
+                <div class="status-item">
+                  <span class="status-label">Next Ad Break:</span>
+                  <span class="status-value" id="nextAdBreakStatus"
+                    >Loading...</span
+                  >
+                </div>
+              </div>
+              <div class="ads-info" id="adsInfo" style="display: none">
+                <div class="info-message">
+                  <i class="fas fa-info-circle"></i>
+                  <span
+                    >Ads management requires a Twitch Partner or Affiliate
+                    account with commercial permissions.</span
+                  >
+                </div>
+              </div>
+              <div class="ads-actions">
+                <button id="refreshAdsStatusBtn" class="action-btn">
+                  <i class="fas fa-sync-alt"></i>
+                  Refresh Status
+                </button>
+              </div>
+            </div>
+
+            <!-- Contrôles des Publicités -->
+            <div class="card">
+              <h3>
+                <i class="fas fa-play-circle"></i>
+                <span data-i18n="web.ads.controls">Ads Controls</span>
+              </h3>
+              <div class="ads-controls">
+                <div class="control-group">
+                  <label
+                    for="commercialLength"
+                    data-i18n="web.ads.commercialLength"
+                    >Commercial Length (seconds):</label
+                  >
+                  <select id="commercialLength">
+                    <option value="30">30 seconds</option>
+                    <option value="60">60 seconds</option>
+                    <option value="90">90 seconds</option>
+                    <option value="120">120 seconds</option>
+                    <option value="150">150 seconds</option>
+                    <option value="180">180 seconds</option>
+                  </select>
+                </div>
+                <div class="control-actions">
+                  <button
+                    id="startCommercialBtn"
+                    class="action-btn btn-primary"
+                  >
+                    <i class="fas fa-play"></i>
+                    Start Commercial
+                  </button>
+                  <button id="snoozeAdBtn" class="action-btn btn-warning">
+                    <i class="fas fa-clock"></i>
+                    Snooze Next Ad
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Historique des Publicités -->
+            <div class="card">
+              <h3>
+                <i class="fas fa-history"></i>
+                <span data-i18n="web.ads.history">Ads History</span>
+              </h3>
+              <div class="ads-history" id="adsHistory">
+                <div class="history-item">
+                  <span class="history-time">No recent activity</span>
+                  <span class="history-action">-</span>
+                </div>
               </div>
             </div>
           </div>

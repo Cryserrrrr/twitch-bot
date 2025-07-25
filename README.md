@@ -158,6 +158,12 @@ src/
 - GitHub issues
 - [Discord](https://discord.gg/w7xDNMBtNG)
 
+## 🚧 Still need to test
+
+- Recurent messages
+- Auto thanks
+- Ads management
+
 ---
 
 **Happy streaming! 🎮🎧**

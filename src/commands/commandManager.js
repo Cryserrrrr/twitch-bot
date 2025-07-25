@@ -261,18 +261,20 @@ class CommandManager {
         }
 
         try {
-          await bot.client.say(
-            channel,
-            `/timeout ${targetUsername} ${duration} ${reason}`
+          // Check if Twitch API is ready
+          if (!bot.twitchApiManager.broadcasterId) {
+            await bot.client.say(
+              channel,
+              `@${username} Twitch API not ready yet. Please authenticate via the web interface first.`
+            );
+            return;
+          }
+
+          // Use Twitch API for timeout instead of tmi.js
+          const userInfo = await bot.twitchApiManager.getUserInfo(
+            targetUsername
           );
-          await bot.client.say(
-            channel,
-            `@${username} ${this.translator.t("commands.timeout.success", {
-              username: targetUsername,
-              duration: duration,
-              reason: reason,
-            })}`
-          );
+          await bot.twitchApiManager.timeoutUser(userInfo.id, duration, reason);
         } catch (error) {
           console.error(
             `[${channel}] Error executing manual timeout for ${targetUsername}:`,
@@ -315,13 +317,6 @@ class CommandManager {
             targetUsername
           );
           await bot.twitchApiManager.banUser(userInfo.id, reason);
-          await bot.client.say(
-            channel,
-            `@${username} ${this.translator.t("commands.ban.success", {
-              username: targetUsername,
-              reason: reason,
-            })}`
-          );
         } catch (error) {
           console.error(
             `[${channel}] Error executing manual ban for ${targetUsername}:`,
@@ -349,17 +344,20 @@ class CommandManager {
         const targetUsername = args[0];
 
         try {
+          // Check if Twitch API is ready
+          if (!bot.twitchApiManager.broadcasterId) {
+            await bot.client.say(
+              channel,
+              `@${username} Twitch API not ready yet. Please authenticate via the web interface first.`
+            );
+            return;
+          }
+
           // Use Twitch API for unban instead of tmi.js
           const userInfo = await bot.twitchApiManager.getUserInfo(
             targetUsername
           );
           await bot.twitchApiManager.unbanUser(userInfo.id);
-          await bot.client.say(
-            channel,
-            `@${username} ${this.translator.t("commands.unban.success", {
-              username: targetUsername,
-            })}`
-          );
         } catch (error) {
           console.error(
             `[${channel}] Error executing manual unban for ${targetUsername}:`,
@@ -368,6 +366,44 @@ class CommandManager {
           await bot.client.say(
             channel,
             `@${username} ${this.translator.t("commands.unban.error", {
+              username: targetUsername,
+              error: error.message,
+            })}`
+          );
+        }
+        return;
+      }
+
+      if (commandName === "delete" && isModerator) {
+        if (args.length < 1) {
+          await bot.client.say(
+            channel,
+            `@${username} ${this.translator.t("commands.delete.usage")}`
+          );
+          return;
+        }
+        const targetUsername = args[0];
+
+        try {
+          // Check if Twitch API is ready
+          if (!bot.twitchApiManager.broadcasterId) {
+            await bot.client.say(
+              channel,
+              `@${username} Twitch API not ready yet. Please authenticate via the web interface first.`
+            );
+            return;
+          }
+
+          // Use Twitch API to delete user's last message
+          await bot.twitchApiManager.deleteUserMessage(targetUsername);
+        } catch (error) {
+          console.error(
+            `[${channel}] Error executing message deletion for ${targetUsername}:`,
+            error
+          );
+          await bot.client.say(
+            channel,
+            `@${username} ${this.translator.t("commands.delete.error", {
               username: targetUsername,
               error: error.message,
             })}`
@@ -433,6 +469,53 @@ class CommandManager {
         return;
       }
 
+      // Ads management commands (moderators and streamer only)
+      if (commandName === "commercial" && isModerator) {
+        const length = args[0] ? parseInt(args[0]) : 30;
+
+        if (isNaN(length) || length < 30 || length > 180) {
+          await bot.client.say(
+            channel,
+            `@${username} ${this.translator.t(
+              "commands.commercial.invalidLength"
+            )}`
+          );
+          return;
+        }
+
+        try {
+          const result = await bot.twitchApiManager.startCommercial(length);
+          await bot.client.say(
+            channel,
+            `@${username} ${this.translator.t("commands.commercial.success", {
+              length: length,
+            })}`
+          );
+        } catch (error) {
+          await bot.client.say(
+            channel,
+            `@${username} ${this.translator.t("commands.commercial.error")}`
+          );
+        }
+        return;
+      }
+
+      if (commandName === "snooze" && isModerator) {
+        try {
+          const result = await bot.twitchApiManager.snoozeNextAd();
+          await bot.client.say(
+            channel,
+            `@${username} ${this.translator.t("commands.snooze.success")}`
+          );
+        } catch (error) {
+          await bot.client.say(
+            channel,
+            `@${username} ${this.translator.t("commands.snooze.error")}`
+          );
+        }
+        return;
+      }
+
       // Unknown command
       await bot.client.say(
         channel,
@@ -461,7 +544,8 @@ class CommandManager {
 
     if (isModerator) {
       help += this.translator.t("bot.moderatorCommands");
-      help += " | Moderation: !timeout, !ban, !unban";
+      help += " | Moderation: !timeout, !ban, !unban, !delete";
+      help += " | Ads: !commercial, !snooze";
     }
 
     return help;
@@ -482,6 +566,9 @@ class CommandManager {
       "timeout",
       "ban",
       "unban",
+      "delete",
+      "commercial",
+      "snooze",
     ];
 
     return {

@@ -8,7 +8,7 @@ module.exports = {
     ping: "Pong! 🏓",
     help: "Available commands: !ping, !dice, !flip, !song, !request, !apexrank",
     moderatorCommands:
-      " | Moderator: !addcom, !delcom, !title, !category, !timeout, !ban, !unban",
+      " | Moderator: !addcom, !delcom, !title, !category, !timeout, !ban, !unban, !delete, !commercial, !snooze",
     streamerCommands: " | Streamer: !sound",
     customCommands: " | Custom commands:",
     nextSteps: "Next steps:",
@@ -80,6 +80,25 @@ module.exports = {
       usage: "Usage: !unban <username> (Moderators only)",
       success: "Unban executed: {username}",
       error: "Error executing unban for {username}: {error}",
+    },
+    delete: {
+      usage: "Usage: !delete <username> (Moderators only)",
+      success: "Message deleted for {username}",
+      error: "Error deleting message for {username}: {error}",
+    },
+    commercial: {
+      usage: "Usage: !commercial [length] (Moderators only, 30-180 seconds)",
+      success: "Commercial started successfully for {length} seconds",
+      error:
+        "Failed to start commercial. Please authenticate through the web interface first.",
+      invalidLength:
+        "Invalid length. Please provide a number between 30 and 180 seconds.",
+    },
+    snooze: {
+      usage: "Usage: !snooze (Moderators only)",
+      success: "Next ad has been snoozed successfully",
+      error:
+        "Failed to snooze next ad. Please authenticate through the web interface first.",
     },
   },
 
@@ -204,6 +223,7 @@ module.exports = {
       moderation: "Moderation",
       recurring: "Recurring Messages",
       integrations: "Integrations",
+      ads: "Ads Management",
     },
     dashboard: {
       botInfo: "Bot Information",
@@ -516,6 +536,27 @@ module.exports = {
           "If the setup script is no longer running, restart it with: npm run setup",
         returnToInterface: "Return to interface",
       },
+    },
+    ads: {
+      status: "Ads Status",
+      controls: "Ads Controls",
+      history: "Ads History",
+      commercialLength: "Commercial Length (seconds)",
+      startCommercial: "Start Commercial",
+      snoozeNextAd: "Snooze Next Ad",
+      refreshStatus: "Refresh Status",
+      commercialActive: "Commercial Active",
+      noActiveCommercial: "No Active Commercial",
+      nextAdIn: "Next ad in {minutes} minutes",
+      noScheduledAds: "No Scheduled Ads",
+      nextBreakIn: "Next break in {minutes} minutes",
+      noScheduledBreaks: "No Scheduled Ad Breaks",
+      commercialStarted:
+        "Commercial started successfully for {seconds} seconds",
+      commercialFailed: "Failed to start commercial",
+      adSnoozed: "Next ad has been snoozed successfully",
+      adSnoozeFailed: "Failed to snooze next ad",
+      noRecentActivity: "No recent activity",
     },
   },
 

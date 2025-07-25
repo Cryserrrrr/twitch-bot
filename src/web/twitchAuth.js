@@ -24,6 +24,7 @@ class TwitchAuth {
       "channel:read:polls",
       "channel:read:predictions",
       "channel:read:redemptions",
+      "channel:read:ads",
       "moderator:read:followers",
       "moderator:read:chatters",
       "moderator:manage:chat_messages",
