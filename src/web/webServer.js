@@ -12,6 +12,7 @@ class WebServer {
     this.app = express();
     this.server = null;
     this.port = process.env.WEB_PORT || 3000;
+    this.webUrl = process.env.WEB_URL || "https://127.0.0.1";
     this.protocol = "http"; // Will be updated to https if SSL is used
     this.twitchAuth = new TwitchAuth();
 
@@ -738,11 +739,19 @@ class WebServer {
   async start() {
     return new Promise((resolve, reject) => {
       try {
+        // Parse the web URL to get host and protocol
+        const url = new URL(this.webUrl);
+        const host = url.hostname;
+        const port = url.port || this.port;
+
         // Check if SSL certificates exist
         const certPath = "./127.0.0.1.pem";
         const keyPath = "./127.0.0.1-key.pem";
 
-        if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
+        if (
+          (fs.existsSync(certPath) && fs.existsSync(keyPath)) ||
+          process.env.NODE_ENV === "development"
+        ) {
           // Use HTTPS with SSL certificates
           const options = {
             cert: fs.readFileSync(certPath),
@@ -751,18 +760,14 @@ class WebServer {
 
           this.server = https.createServer(options, this.app);
           this.protocol = "https";
-          this.server.listen(this.port, "127.0.0.1", () => {
-            console.log(
-              `🌐 Interface available: https://127.0.0.1:${this.port}`
-            );
+          this.server.listen(port, host, () => {
+            console.log(`🌐 Interface available: ${this.webUrl}:${port}`);
             resolve();
           });
         } else {
           // Fallback to HTTP if certificates don't exist
-          this.server = this.app.listen(this.port, "127.0.0.1", () => {
-            console.log(
-              `🌐 Interface available: http://127.0.0.1:${this.port}`
-            );
+          this.server = this.app.listen(port, host, () => {
+            console.log(`🌐 Interface available: http://${host}:${port}`);
             resolve();
           });
         }
@@ -840,7 +845,7 @@ class WebServer {
 
   // Get base URL with correct protocol
   getBaseUrl() {
-    return `${this.protocol}://127.0.0.1:${this.port}`;
+    return `${this.protocol}://${new URL(this.webUrl).hostname}:${this.port}`;
   }
 }
 
