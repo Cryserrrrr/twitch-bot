@@ -24,6 +24,16 @@ class ConfigSetup {
       currentConfig = this.loadCurrentConfig();
     }
 
+    // Web Configuration (required for callbacks)
+    if (!currentConfig.WEB_URL) {
+      console.log("\n🌐 Web Configuration (required for callbacks)");
+      console.log("=============================================");
+      currentConfig.WEB_URL = await this.questionWithDefault(
+        "Web interface URL (default: https://127.0.0.1)",
+        currentConfig.WEB_URL || "https://127.0.0.1"
+      );
+    }
+
     // Main menu
     await this.showMainMenu(currentConfig);
   }
@@ -117,7 +127,7 @@ class ConfigSetup {
       console.log("\n📋 Instructions to get your Twitch Auth credentials:");
       console.log("1. Go to https://dev.twitch.tv/console");
       console.log("2. Create a new application");
-      console.log("3. Add /callback/twitch to Redirect URIs (localhost:3000)");
+      console.log(`3. Add ${config.WEB_URL}/callback/twitch to Redirect URIs`);
       console.log("4. Copy Client ID and Client Secret\n");
 
       config.TWITCH_CLIENT_ID = await this.questionWithDefault(
@@ -130,11 +140,7 @@ class ConfigSetup {
         config.TWITCH_CLIENT_SECRET || ""
       );
 
-      config.TWITCH_REDIRECT_URI = await this.questionWithDefault(
-        "Twitch Redirect URI (default: https://127.0.0.1:3000/callback/twitch)",
-        config.TWITCH_REDIRECT_URI || "https://127.0.0.1:3000/callback/twitch"
-      );
-
+      config.TWITCH_REDIRECT_URI = `${config.WEB_URL}/callback/twitch`;
       config.WEB_AUTH_ENABLED = "true";
     } else {
       // Clear Twitch Auth settings if user doesn't want to use it
@@ -156,10 +162,7 @@ class ConfigSetup {
       config.SPOTIFY_CLIENT_SECRET || ""
     );
 
-    config.SPOTIFY_REDIRECT_URI = await this.questionWithDefault(
-      "Spotify Redirect URI (default: https://127.0.0.1:3000/callback/spotify)",
-      config.SPOTIFY_REDIRECT_URI || "https://127.0.0.1:3000/callback/spotify"
-    );
+    config.SPOTIFY_REDIRECT_URI = `${config.WEB_URL}/callback/spotify`;
 
     // Refresh token management
     if (config.SPOTIFY_CLIENT_ID && config.SPOTIFY_CLIENT_SECRET) {
@@ -250,6 +253,11 @@ class ConfigSetup {
   }
 
   async configureWeb(config) {
+    config.WEB_URL = await this.questionWithDefault(
+      "Web interface URL (default: https://127.0.0.1)",
+      config.WEB_URL || "https://127.0.0.1"
+    );
+
     config.WEB_PORT = await this.questionWithDefault(
       "Web server port (default: 3000)",
       config.WEB_PORT || "3000"
@@ -439,9 +447,7 @@ class ConfigSetup {
     envContent += `TWITCH_CHANNEL=${config.TWITCH_CHANNEL || ""}\n`;
     envContent += `TWITCH_CLIENT_ID=${config.TWITCH_CLIENT_ID || ""}\n`;
     envContent += `TWITCH_CLIENT_SECRET=${config.TWITCH_CLIENT_SECRET || ""}\n`;
-    envContent += `TWITCH_REDIRECT_URI=${
-      config.TWITCH_REDIRECT_URI || "https://127.0.0.1:3000/callback/twitch"
-    }\n`;
+    envContent += `TWITCH_REDIRECT_URI=${config.TWITCH_REDIRECT_URI || ""}\n`;
     envContent += `WEB_AUTH_ENABLED=${config.WEB_AUTH_ENABLED || "false"}\n\n`;
 
     envContent += "# === SPOTIFY CONFIGURATION ===\n";
@@ -449,9 +455,7 @@ class ConfigSetup {
     envContent += `SPOTIFY_CLIENT_SECRET=${
       config.SPOTIFY_CLIENT_SECRET || ""
     }\n`;
-    envContent += `SPOTIFY_REDIRECT_URI=${
-      config.SPOTIFY_REDIRECT_URI || "https://127.0.0.1:3000/callback/spotify"
-    }\n`;
+    envContent += `SPOTIFY_REDIRECT_URI=${config.SPOTIFY_REDIRECT_URI || ""}\n`;
     envContent += `SPOTIFY_REFRESH_TOKEN=${
       config.SPOTIFY_REFRESH_TOKEN || ""
     }\n\n`;
@@ -467,6 +471,7 @@ class ConfigSetup {
     envContent += `OBS_PASSWORD=${config.OBS_PASSWORD || ""}\n\n`;
 
     envContent += "# === WEB CONFIGURATION ===\n";
+    envContent += `WEB_URL=${config.WEB_URL || "https://127.0.0.1"}\n`;
     envContent += `WEB_PORT=${config.WEB_PORT || "3000"}\n`;
     envContent += `NODE_ENV=${config.NODE_ENV || "development"}\n\n`;
 

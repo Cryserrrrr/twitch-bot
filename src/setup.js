@@ -152,6 +152,10 @@ class SetupWizard {
       (await this.question("Language (default: en) available: en, fr: ")) ||
       "en";
 
+    config.NODE_ENV =
+      (await this.question("Node environment (default: development): ")) ||
+      "development";
+
     // Generate .env file
     await this.generateEnvFile(config);
 
