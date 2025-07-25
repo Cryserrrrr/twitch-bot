@@ -51,7 +51,7 @@ module.exports = {
       error: "Erreur lors de l'ajout de la chanson",
     },
     apexrank: {
-      result: "🏆 {username} {result}",
+      result: "🏆 {result}",
     },
     title: {
       success: 'Titre du stream changé vers: "{title}"',
@@ -376,7 +376,7 @@ module.exports = {
       notConnected:
         "Spotify non connecté. Configurez votre token dans le fichier .env",
       // Messages de statut de musique
-      noMusicPlaying: "Aucune musique en cours",
+      noMusicPlaying: "Pas de musique en ce moment ! Le DJ fait une pause 😴",
       currentSong: "🎵 {song} - {artists} | Album: {album}",
       // Messages de demande de chanson
       invalidUrl: "URL Spotify invalide. Utilisez un lien de chanson Spotify.",

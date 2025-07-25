@@ -109,7 +109,10 @@ class OBSManager {
 
       console.log(`📁 ${this.mediaSources.size} media sources found in OBS`);
     } catch (error) {
-      console.error(this.translator.t("obs.errorLoadingMediaSources"), error);
+      console.error(
+        this.translator.t("web.obs.errorLoadingMediaSources"),
+        error
+      );
     }
   }
 
@@ -122,7 +125,7 @@ class OBSManager {
       const response = await this.obs.call("GetSceneList");
       return response.scenes.map((scene) => scene.sceneName);
     } catch (error) {
-      console.error(this.translator.t("obs.errorRetrievingScenes"), error);
+      console.error(this.translator.t("web.obs.errorRetrievingScenes"), error);
       return [];
     }
   }
@@ -139,7 +142,7 @@ class OBSManager {
         kind: input.inputKind,
       }));
     } catch (error) {
-      console.error(this.translator.t("obs.errorRetrievingSources"), error);
+      console.error(this.translator.t("web.obs.errorRetrievingSources"), error);
       return [];
     }
   }
@@ -157,7 +160,7 @@ class OBSManager {
       };
     } catch (error) {
       console.error(
-        this.translator.t("obs.errorRetrievingStreamStatus"),
+        this.translator.t("web.obs.errorRetrievingStreamStatus"),
         error
       );
       return { streaming: false, recording: false };
@@ -166,65 +169,65 @@ class OBSManager {
 
   async startStream() {
     if (!this.enabled) {
-      return this.translator.t("obs.integrationDisabled");
+      return this.translator.t("web.obs.integrationDisabled");
     }
 
     if (!this.connected) {
-      return this.translator.t("obs.notConnected");
+      return this.translator.t("web.obs.notConnected");
     }
 
     try {
       await this.obs.call("StartStream");
-      return this.translator.t("obs.streamStarted");
+      return this.translator.t("web.obs.streamStarted");
     } catch (error) {
-      console.error(this.translator.t("obs.errorStartingStream"), error);
-      return this.translator.t("obs.errorStartingStreamMessage");
+      console.error(this.translator.t("web.obs.errorStartingStream"), error);
+      return this.translator.t("web.obs.errorStartingStreamMessage");
     }
   }
 
   async stopStream() {
     if (!this.enabled) {
-      return this.translator.t("obs.integrationDisabled");
+      return this.translator.t("web.obs.integrationDisabled");
     }
 
     if (!this.connected) {
-      return this.translator.t("obs.notConnected");
+      return this.translator.t("web.obs.notConnected");
     }
 
     try {
       await this.obs.call("StopStream");
-      return this.translator.t("obs.streamStopped");
+      return this.translator.t("web.obs.streamStopped");
     } catch (error) {
-      console.error(this.translator.t("obs.errorStoppingStream"), error);
-      return this.translator.t("obs.errorStoppingStreamMessage");
+      console.error(this.translator.t("web.obs.errorStoppingStream"), error);
+      return this.translator.t("web.obs.errorStoppingStreamMessage");
     }
   }
 
   async switchScene(sceneName) {
     if (!this.enabled) {
-      return this.translator.t("obs.integrationDisabled");
+      return this.translator.t("web.obs.integrationDisabled");
     }
 
     if (!this.connected) {
-      return this.translator.t("obs.notConnected");
+      return this.translator.t("web.obs.notConnected");
     }
 
     try {
       await this.obs.call("SetCurrentProgramScene", { sceneName });
-      return this.translator.t("obs.sceneChanged", { scene: sceneName });
+      return this.translator.t("web.obs.sceneChanged", { scene: sceneName });
     } catch (error) {
-      console.error(this.translator.t("obs.errorChangingScene"), error);
-      return this.translator.t("obs.errorChangingSceneMessage");
+      console.error(this.translator.t("web.obs.errorChangingScene"), error);
+      return this.translator.t("web.obs.errorChangingSceneMessage");
     }
   }
 
   async toggleSource(sourceName, sceneName = "Scene") {
     if (!this.enabled) {
-      return this.translator.t("obs.integrationDisabled");
+      return this.translator.t("web.obs.integrationDisabled");
     }
 
     if (!this.connected) {
-      return this.translator.t("obs.notConnected");
+      return this.translator.t("web.obs.notConnected");
     }
 
     try {
@@ -234,7 +237,7 @@ class OBSManager {
       );
 
       if (!item) {
-        return this.translator.t("obs.sourceNotFound", {
+        return this.translator.t("web.obs.sourceNotFound", {
           source: sourceName,
           scene: sceneName,
         });
@@ -246,13 +249,13 @@ class OBSManager {
         sceneItemEnabled: !item.sceneItemEnabled,
       });
 
-      return this.translator.t("obs.sourceToggled", {
+      return this.translator.t("web.obs.sourceToggled", {
         source: sourceName,
         status: item.sceneItemEnabled ? "disabled" : "enabled",
       });
     } catch (error) {
-      console.error(this.translator.t("obs.errorTogglingSource"), error);
-      return this.translator.t("obs.errorTogglingSourceMessage");
+      console.error(this.translator.t("web.obs.errorTogglingSource"), error);
+      return this.translator.t("web.obs.errorTogglingSourceMessage");
     }
   }
 

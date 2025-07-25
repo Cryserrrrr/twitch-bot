@@ -18,14 +18,14 @@ class ModerationManager {
     if (!this.database) return;
 
     try {
-      // Charger les mots interdits
+      // Load banned words
       const bannedWords = await this.database.getBannedWords();
       this.bannedWords.clear();
       bannedWords.forEach((word) =>
         this.bannedWords.add(word.word.toLowerCase())
       );
 
-      // Charger les liens autorisés
+      // Load allowed links
       const allowedLinks = await this.database.getAllowedLinks();
       this.allowedLinks.clear();
       allowedLinks.forEach((link) =>

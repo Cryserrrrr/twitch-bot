@@ -23,21 +23,21 @@ class WebServer {
   }
 
   setupMiddleware() {
-    // Sécurité
+    // Security
     this.app.use(
       helmet({
-        contentSecurityPolicy: false, // Désactivé pour le développement
+        contentSecurityPolicy: false, // Disabled for development
       })
     );
 
     // CORS
     this.app.use(cors());
 
-    // Parsing JSON
+    // JSON parsing
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));
 
-    // Fichiers statiques
+    // Static files
     this.app.use(express.static(path.join(__dirname, "public")));
   }
 
@@ -52,7 +52,7 @@ class WebServer {
     // Authentication routes
     this.setupAuthRoutes();
 
-    // Route principale
+    // Main route
     this.app.get("/", (req, res) => {
       res.sendFile(path.join(__dirname, "public", "index.html"));
     });
@@ -60,9 +60,9 @@ class WebServer {
     // API Routes (protected)
     this.setupApiRoutes();
 
-    // Gestion des erreurs 404
+    // 404 error handling
     this.app.use("*", (req, res) => {
-      res.status(404).json({ error: "Route non trouvée" });
+      res.status(404).json({ error: "Route not found" });
     });
   }
 
@@ -130,15 +130,9 @@ class WebServer {
       try {
         const authResult = await this.twitchAuth.authenticate(code);
 
-        // Save tokens to TwitchCommands and TwitchApiManager if authentication is successful
+        // Save tokens to TwitchApiManager if authentication is successful
         if (authResult.success && authResult.tokens) {
-          this.bot.commandManager.twitchCommands.setTokens(
-            authResult.tokens.accessToken,
-            authResult.tokens.refreshToken,
-            authResult.tokens.expiresIn
-          );
-
-          // Also save to TwitchApiManager
+          // Save to TwitchApiManager
           if (this.bot.twitchApiManager) {
             this.bot.twitchApiManager.setTokens(
               authResult.tokens.accessToken,
@@ -236,11 +230,11 @@ class WebServer {
       } catch (error) {
         res.send(`
           <html>
-            <head><title>Erreur d'authentification</title></head>
+            <head><title>Authentication Error</title></head>
             <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
-              <h1 style="color: #ff4444;">❌ Erreur d'authentification</h1>
-              <p>Une erreur est survenue lors de l'authentification.</p>
-              <p><a href="/" style="color: #9146ff;">Retour à l'interface</a></p>
+              <h1 style="color: #ff4444;">❌ Authentication Error</h1>
+              <p>An error occurred during authentication.</p>
+              <p><a href="/" style="color: #9146ff;">Return to interface</a></p>
             </body>
           </html>
         `);
@@ -306,40 +300,30 @@ class WebServer {
       this.requireAuth(req, res, next);
     });
 
-    // Commandes
+    // Commands
     this.app.get("/api/commands", async (req, res) => {
       try {
         const commands = await this.bot.database.getAllCommands();
         res.json(commands);
       } catch (error) {
         console.error("Error getting commands:", error);
-        res
-          .status(500)
-          .json({ error: "Erreur lors de la récupération des commandes" });
+        res.status(500).json({ error: "Error retrieving commands" });
       }
     });
 
     this.app.post("/api/commands", async (req, res) => {
       try {
         const { name, content, createdBy } = req.body;
-        console.log("🔍 Session debug (commands):", {
-          session: req.session,
-          twitchUsername: req.session?.twitchUsername,
-          user: req.session?.user,
-        });
         const actualCreatedBy =
           req.session?.twitchUsername ||
           req.session?.user?.login ||
           req.session?.user?.display_name ||
           createdBy ||
           "web-interface";
-        console.log("👤 Using createdBy:", actualCreatedBy);
         await this.bot.database.addCommand(name, content, actualCreatedBy);
-        res.json({ success: true, message: "Commande ajoutée avec succès" });
+        res.json({ success: true, message: "Command added successfully" });
       } catch (error) {
-        res
-          .status(500)
-          .json({ error: "Erreur lors de l'ajout de la commande" });
+        res.status(500).json({ error: "Error adding command" });
       }
     });
 
@@ -350,13 +334,11 @@ class WebServer {
         await this.bot.database.updateCommand(name, content, updatedBy);
         res.json({
           success: true,
-          message: "Commande mise à jour avec succès",
+          message: "Command updated successfully",
         });
       } catch (error) {
         console.error("Error updating command:", error);
-        res
-          .status(500)
-          .json({ error: "Erreur lors de la mise à jour de la commande" });
+        res.status(500).json({ error: "Error updating command" });
       }
     });
 
@@ -364,41 +346,31 @@ class WebServer {
       try {
         const name = decodeURIComponent(req.params.name);
         await this.bot.database.deleteCommand(name);
-        res.json({ success: true, message: "Commande supprimée avec succès" });
+        res.json({ success: true, message: "Command deleted successfully" });
       } catch (error) {
         console.error("Error deleting command:", error);
-        res
-          .status(500)
-          .json({ error: "Erreur lors de la suppression de la commande" });
+        res.status(500).json({ error: "Error deleting command" });
       }
     });
 
-    // Modération
+    // Moderation
     this.app.get("/api/moderation/banned-words", async (req, res) => {
       try {
         const bannedWords = await this.bot.database.getBannedWords();
         res.json(bannedWords);
       } catch (error) {
-        res
-          .status(500)
-          .json({ error: "Erreur lors de la récupération des mots interdits" });
+        res.status(500).json({ error: "Error retrieving banned words" });
       }
     });
 
     this.app.post("/api/moderation/banned-words", async (req, res) => {
       try {
         const { word, action, duration } = req.body;
-        console.log("🔍 Session debug:", {
-          session: req.session,
-          twitchUsername: req.session?.twitchUsername,
-          user: req.session?.user,
-        });
         const addedBy =
           req.session?.twitchUsername ||
           req.session?.user?.login ||
           req.session?.user?.display_name ||
           "web-interface";
-        console.log("👤 Using addedBy:", addedBy);
         await this.bot.moderationManager.addBannedWord(
           word,
           action,
@@ -407,11 +379,9 @@ class WebServer {
         );
         // Reload moderation data to ensure consistency
         await this.bot.moderationManager.loadModerationData();
-        res.json({ success: true, message: "Mot interdit ajouté avec succès" });
+        res.json({ success: true, message: "Banned word added successfully" });
       } catch (error) {
-        res
-          .status(500)
-          .json({ error: "Erreur lors de l'ajout du mot interdit" });
+        res.status(500).json({ error: "Error adding banned word" });
       }
     });
 
@@ -428,13 +398,11 @@ class WebServer {
         await this.bot.moderationManager.loadModerationData();
         res.json({
           success: true,
-          message: "Mot interdit mis à jour avec succès",
+          message: "Banned word updated successfully",
         });
       } catch (error) {
         console.error("Error updating banned word:", error);
-        res
-          .status(500)
-          .json({ error: "Erreur lors de la mise à jour du mot interdit" });
+        res.status(500).json({ error: "Error updating banned word" });
       }
     });
 
@@ -446,13 +414,11 @@ class WebServer {
         await this.bot.moderationManager.loadModerationData();
         res.json({
           success: true,
-          message: "Mot interdit supprimé avec succès",
+          message: "Banned word deleted successfully",
         });
       } catch (error) {
         console.error("Error deleting banned word:", error);
-        res
-          .status(500)
-          .json({ error: "Erreur lors de la suppression du mot interdit" });
+        res.status(500).json({ error: "Error deleting banned word" });
       }
     });
 
@@ -462,7 +428,7 @@ class WebServer {
         res.json(allowedLinks);
       } catch (error) {
         res.status(500).json({
-          error: "Erreur lors de la récupération des liens autorisés",
+          error: "Error retrieving allowed links",
         });
       }
     });
@@ -470,18 +436,12 @@ class WebServer {
     this.app.post("/api/moderation/allowed-links", async (req, res) => {
       try {
         const { domain, addedBy } = req.body;
-        console.log("🔍 Session debug (links):", {
-          session: req.session,
-          twitchUsername: req.session?.twitchUsername,
-          user: req.session?.user,
-        });
         const actualAddedBy =
           req.session?.twitchUsername ||
           req.session?.user?.login ||
           req.session?.user?.display_name ||
           addedBy ||
           "web-interface";
-        console.log("👤 Using addedBy:", actualAddedBy);
         const result = await this.bot.moderationManager.addAllowedLink(
           domain,
           actualAddedBy
@@ -490,9 +450,9 @@ class WebServer {
         await this.bot.moderationManager.loadModerationData();
         res.json({ success: true, message: result });
       } catch (error) {
-        console.error("Erreur lors de l'ajout du lien autorisé:", error);
+        console.error("Error adding allowed link:", error);
         res.status(500).json({
-          error: "Erreur lors de l'ajout du lien autorisé",
+          error: "Error adding allowed link",
           details: error.message,
         });
       }
@@ -512,7 +472,7 @@ class WebServer {
         } catch (error) {
           console.error("Error deleting allowed link:", error);
           res.status(500).json({
-            error: "Erreur lors de la suppression du lien autorisé",
+            error: "Error deleting allowed link",
           });
         }
       }
@@ -525,7 +485,7 @@ class WebServer {
         res.json(settings);
       } catch (error) {
         res.status(500).json({
-          error: "Erreur lors de la récupération des paramètres de modération",
+          error: "Error retrieving moderation settings",
         });
       }
     });
@@ -537,10 +497,10 @@ class WebServer {
           bannedWordsEnabled,
           allowedLinksEnabled
         );
-        res.json({ success: true, message: "Paramètres mis à jour" });
+        res.json({ success: true, message: "Settings updated" });
       } catch (error) {
         res.status(500).json({
-          error: "Erreur lors de la mise à jour des paramètres",
+          error: "Error updating settings",
         });
       }
     });
@@ -552,7 +512,7 @@ class WebServer {
         res.json(currentTrack);
       } catch (error) {
         res.status(500).json({
-          error: "Erreur lors de la récupération de la chanson actuelle",
+          error: "Error retrieving current song",
         });
       }
     });
@@ -560,7 +520,7 @@ class WebServer {
     this.app.get("/api/spotify/status", (req, res) => {
       res.json({
         connected: this.bot.spotifyManager.isConnected(),
-        playlistInfo: null, // À implémenter si nécessaire
+        playlistInfo: null, // To implement if needed
       });
     });
 
@@ -568,8 +528,8 @@ class WebServer {
     this.app.get("/api/obs/status", (req, res) => {
       res.json({
         connected: this.bot.obsManager.isConnected(),
-        scenes: [], // À implémenter si nécessaire
-        sources: [], // À implémenter si nécessaire
+        scenes: [], // To implement if needed
+        sources: [], // To implement if needed
       });
     });
 
@@ -579,24 +539,22 @@ class WebServer {
         const status = await this.bot.apexManager.checkApiStatus();
         res.json(status);
       } catch (error) {
-        res
-          .status(500)
-          .json({ error: "Erreur lors de la vérification du statut Apex" });
+        res.status(500).json({ error: "Error checking Apex status" });
       }
     });
 
-    // Actions du bot
+    // Bot actions
     this.app.post("/api/bot/say", async (req, res) => {
       try {
         const { message } = req.body;
         if (this.bot.isConnected && this.bot.client) {
           await this.bot.client.say(`#${process.env.TWITCH_CHANNEL}`, message);
-          res.json({ success: true, message: "Message envoyé" });
+          res.json({ success: true, message: "Message sent" });
         } else {
-          res.status(400).json({ error: "Bot non connecté" });
+          res.status(400).json({ error: "Bot not connected" });
         }
       } catch (error) {
-        res.status(500).json({ error: "Erreur lors de l'envoi du message" });
+        res.status(500).json({ error: "Error sending message" });
       }
     });
 
@@ -608,14 +566,14 @@ class WebServer {
       });
     });
 
-    // Messages récurrents
+    // Recurring messages
     this.app.get("/api/recurring-messages", async (req, res) => {
       try {
         const messages = this.bot.recurringMessageManager.getMessages();
         res.json(messages);
       } catch (error) {
         res.status(500).json({
-          error: "Erreur lors de la récupération des messages récurrents",
+          error: "Error retrieving recurring messages",
         });
       }
     });
@@ -629,9 +587,7 @@ class WebServer {
         );
         res.json({ success: true, message: result });
       } catch (error) {
-        res
-          .status(500)
-          .json({ error: "Erreur lors de l'ajout du message récurrent" });
+        res.status(500).json({ error: "Error adding recurring message" });
       }
     });
 
@@ -648,7 +604,7 @@ class WebServer {
         res.json({ success: true, message: result });
       } catch (error) {
         res.status(500).json({
-          error: "Erreur lors de la mise à jour du message récurrent",
+          error: "Error updating recurring message",
         });
       }
     });
@@ -660,12 +616,12 @@ class WebServer {
         res.json({ success: true, message: result });
       } catch (error) {
         res.status(500).json({
-          error: "Erreur lors de la suppression du message récurrent",
+          error: "Error deleting recurring message",
         });
       }
     });
 
-    // Callback Spotify
+    // Spotify callback
     this.app.get("/callback/spotify", (req, res) => {
       const { code, error } = req.query;
 

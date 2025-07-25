@@ -88,11 +88,6 @@ class Database {
 
   async insertDefaultData() {
     try {
-      // Check if banned_words table is empty
-      const bannedWordsCount = await this.get(
-        "SELECT COUNT(*) as count FROM banned_words"
-      );
-
       // Check if allowed_links table is empty
       const allowedLinksCount = await this.get(
         "SELECT COUNT(*) as count FROM allowed_links"
@@ -194,22 +189,6 @@ class Database {
     return this.run(
       "UPDATE commands SET usage_count = usage_count + 1 WHERE name = ?",
       [name]
-    );
-  }
-
-  // Methods for greeted users
-  async isUserGreeted(username) {
-    const user = await this.get(
-      "SELECT * FROM greeted_users WHERE username = ?",
-      [username]
-    );
-    return !!user;
-  }
-
-  async markUserAsGreeted(username) {
-    return this.run(
-      "INSERT OR REPLACE INTO greeted_users (username) VALUES (?)",
-      [username]
     );
   }
 

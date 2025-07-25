@@ -70,9 +70,8 @@ class ApexManager {
 
   async getRank() {
     if (!this.username) {
-      return this.translator.t("apex.usernameNotConfigured");
+      return this.translator.t("web.apex.usernameNotConfigured");
     }
-
     try {
       const cacheKey = `rank_${this.username}_${this.platform}`;
       const cached = this.getCachedData(cacheKey);
@@ -84,17 +83,17 @@ class ApexManager {
 
       const stats = data?.global;
       if (!stats || !stats.rank) {
-        return this.translator.t("apex.noRankData");
+        return this.translator.t("web.apex.noRankData");
       }
 
       const rank = stats.rank.rankName + " " + stats.rank.rankDiv;
 
-      const result = this.translator.t("apex.rank", { rank: rank });
+      const result = rank;
 
       this.setCachedData(cacheKey, result);
       return result;
     } catch (error) {
-      console.error(this.translator.t("apex.errorGettingRank"), error);
+      console.error(this.translator.t("web.apex.errorGettingRank"), error);
       return error.message;
     }
   }
@@ -121,18 +120,20 @@ class ApexManager {
   // Method to get statistics for a specific legend
   async getLegendStats(legendName) {
     if (!this.username) {
-      return this.translator.t("apex.usernameNotConfigured");
+      return this.translator.t("web.apex.usernameNotConfigured");
     }
 
     try {
       const data = await this.getDetailedStats();
       if (!data || !data.data?.segments) {
-        return this.translator.t("apex.noLegendData");
+        return this.translator.t("web.apex.noLegendData");
       }
 
       const legend = data.legends?.all?.[legendName.toLowerCase()];
       if (!legend) {
-        return this.translator.t("apex.legendNotFound", { legend: legendName });
+        return this.translator.t("web.apex.legendNotFound", {
+          legend: legendName,
+        });
       }
 
       const stats = legend.Stats;
@@ -151,7 +152,7 @@ class ApexManager {
       const winRate =
         gamesPlayed > 0 ? ((wins / gamesPlayed) * 100).toFixed(1) : "0.0";
 
-      return this.translator.t("apex.legendStats", {
+      return this.translator.t("web.apex.legendStats", {
         legend: legendName,
         kills: kills.toLocaleString(),
         kd: kdRatio,
@@ -160,15 +161,18 @@ class ApexManager {
         winRate: winRate,
       });
     } catch (error) {
-      console.error(this.translator.t("apex.errorGettingLegendStats"), error);
-      return this.translator.t("apex.errorGettingLegendStatsMessage");
+      console.error(
+        this.translator.t("web.apex.errorGettingLegendStats"),
+        error
+      );
+      return this.translator.t("web.apex.errorGettingLegendStatsMessage");
     }
   }
 
   // Method to get season statistics
   async getSeasonStats() {
     if (!this.username) {
-      return this.translator.t("apex.usernameNotConfigured");
+      return this.translator.t("web.apex.usernameNotConfigured");
     }
 
     try {
@@ -183,7 +187,7 @@ class ApexManager {
       // Mozambique API doesn't separate season stats, we use global stats
       const stats = data.stats?.global;
       if (!stats) {
-        return this.translator.t("apex.noSeasonData");
+        return this.translator.t("web.apex.noSeasonData");
       }
 
       const level = stats.level || "N/A";
@@ -202,7 +206,7 @@ class ApexManager {
       const winRate =
         gamesPlayed > 0 ? ((wins / gamesPlayed) * 100).toFixed(1) : "0.0";
 
-      const result = this.translator.t("apex.seasonStats", {
+      const result = this.translator.t("web.apex.seasonStats", {
         level: level,
         kills: kills.toLocaleString(),
         kd: kdRatio,
@@ -214,7 +218,10 @@ class ApexManager {
       this.setCachedData(cacheKey, result);
       return result;
     } catch (error) {
-      console.error(this.translator.t("apex.errorGettingSeasonStats"), error);
+      console.error(
+        this.translator.t("web.apex.errorGettingSeasonStats"),
+        error
+      );
       return error.message;
     }
   }
@@ -230,7 +237,7 @@ class ApexManager {
       if (!this.apiKey || this.apiKey.trim() === "") {
         return {
           status: "error",
-          message: this.translator.t("apex.apiKeyRequired"),
+          message: this.translator.t("web.apex.apiKeyRequired"),
           data: null,
         };
       }
@@ -243,13 +250,13 @@ class ApexManager {
       if (response.ok) {
         return {
           status: "online",
-          message: this.translator.t("apex.apiAvailable"),
+          message: this.translator.t("web.apex.apiAvailable"),
           data: null,
         };
       } else {
         return {
           status: "error",
-          message: this.translator.t("apex.apiUnavailable", {
+          message: this.translator.t("web.apex.apiUnavailable", {
             status: response.status,
             statusText: response.statusText,
           }),
@@ -259,7 +266,7 @@ class ApexManager {
     } catch (error) {
       return {
         status: "error",
-        message: this.translator.t("apex.apiConnectionError"),
+        message: this.translator.t("web.apex.apiConnectionError"),
         data: null,
       };
     }

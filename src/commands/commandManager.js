@@ -212,7 +212,6 @@ class CommandManager {
         await bot.client.say(
           channel,
           `@${username} ${this.translator.t("commands.apexrank.result", {
-            username,
             result,
           })}`
         );

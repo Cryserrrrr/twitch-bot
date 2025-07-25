@@ -373,7 +373,7 @@ module.exports = {
       notConnected:
         "Spotify not connected. Configure your token in the .env file",
       // Music status messages
-      noMusicPlaying: "No music currently playing",
+      noMusicPlaying: "No music playing right now! The DJ is taking a break 😴",
       currentSong: "🎵 {song} - {artists} | Album: {album}",
       // Song request messages
       invalidUrl: "Invalid Spotify URL. Use a Spotify song link.",

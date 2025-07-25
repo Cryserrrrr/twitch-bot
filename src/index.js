@@ -16,15 +16,15 @@ const Translator = require("./utils/translator");
 
 class TwitchBot {
   constructor() {
-    this.client = null; // tmi.js client for chat only
+    this.client = null;
     this.database = null;
     this.commandManager = null;
     this.moderationManager = null;
     this.spotifyManager = null;
     this.apexManager = null;
     this.obsManager = null;
-    this.twitchApiManager = null; // New Twitch API manager
-    this.eventSubManager = null; // New EventSub manager
+    this.twitchApiManager = null;
+    this.eventSubManager = null;
 
     this.webServer = null;
     this.eventManager = null;
@@ -37,8 +37,6 @@ class TwitchBot {
 
   async initialize() {
     try {
-      // Language is set in the Translator constructor from process.env.LANGUAGE
-
       // Initialize database
       this.database = new Database();
       await this.database.initialize();
@@ -67,16 +65,17 @@ class TwitchBot {
           "📝 Copy this URL in your browser to authorize the application"
         );
       }
+
       this.apexManager = new ApexManager();
       this.obsManager = new OBSManager();
       await this.obsManager.connect();
 
       this.eventManager = new EventManager(this.database);
 
-      // Initialize Twitch API manager (will be fully initialized after auth)
+      // Initialize Twitch API manager
       this.twitchApiManager = new TwitchApiManager();
 
-      // Initialize EventSub manager (will be fully initialized after auth)
+      // Initialize EventSub manager
       this.eventSubManager = new EventSubManager(this);
 
       // Pass TwitchApiManager to command manager
@@ -87,7 +86,7 @@ class TwitchBot {
       // Initialize web server
       this.webServer = new WebServer(this);
 
-      // Setup Twitch client (tmi.js for chat only)
+      // Setup Twitch client
       this.setupTwitchClient();
 
       // Initialize Twitch API and EventSub in background
@@ -156,10 +155,10 @@ class TwitchBot {
     const username = tags.username;
 
     try {
-      // Vérifier le statut du stream et mettre à jour les messages récurrents
+      // Check stream status and update recurring messages
       await this.checkStreamStatus();
 
-      // Modération
+      // Moderation
       const moderationResult = await this.moderationManager.checkMessage(
         message,
         tags
@@ -228,7 +227,7 @@ class TwitchBot {
         await this.commandManager.handleCommand(channel, tags, message, this);
       }
     } catch (error) {
-      console.error("Erreur lors du traitement du message:", error);
+      console.error("Error processing message:", error);
     }
   }
 
@@ -240,10 +239,7 @@ class TwitchBot {
         this.recurringMessageManager.setStreamStatus(isStreamActive);
       }
     } catch (error) {
-      console.error(
-        "Erreur lors de la vérification du statut du stream:",
-        error
-      );
+      console.error("Error checking stream status:", error);
     }
   }
 
@@ -253,19 +249,19 @@ class TwitchBot {
       const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
 
       console.log(
-        `🔄 Tentative de reconnexion ${this.reconnectAttempts}/${this.maxReconnectAttempts} dans ${delay}ms...`
+        `🔄 Reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms...`
       );
 
       setTimeout(async () => {
         try {
           await this.client.connect();
         } catch (error) {
-          console.error("Erreur lors de la reconnexion:", error);
+          console.error("Error during reconnection:", error);
           this.handleReconnect();
         }
       }, delay);
     } else {
-      console.error("❌ Nombre maximum de tentatives de reconnexion atteint");
+      console.error("❌ Maximum reconnection attempts reached");
       process.exit(1);
     }
   }
@@ -341,6 +337,6 @@ process.on("SIGTERM", async () => {
 // Start the bot
 const bot = new TwitchBot();
 bot.start().catch((error) => {
-  console.error("❌ Erreur fatale:", error);
+  console.error("❌ Fatal error:", error);
   process.exit(1);
 });

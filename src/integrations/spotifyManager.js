@@ -56,7 +56,7 @@ class SpotifyManager {
       const response = await this.spotifyApi.getMyCurrentPlayingTrack();
 
       if (!response.body.item) {
-        return this.translator.t("spotify.noMusicPlaying");
+        return this.translator.t("web.spotify.noMusicPlaying");
       }
 
       const track = response.body.item;
@@ -71,27 +71,30 @@ class SpotifyManager {
         progress: response.body.progress_ms,
       };
 
-      return this.translator.t("spotify.currentSong", {
+      return this.translator.t("web.spotify.currentSong", {
         song: track.name,
         artists: artists,
         album: track.album.name,
       });
     } catch (error) {
-      console.error(this.translator.t("spotify.errorRetrievingSong"), error);
-      return this.translator.t("spotify.errorRetrievingSongMessage");
+      console.error(
+        this.translator.t("web.spotify.errorRetrievingSong"),
+        error
+      );
+      return this.translator.t("web.spotify.errorRetrievingSongMessage");
     }
   }
 
   async requestSong(spotifyUrl, username) {
     if (!this.isAuthenticated) {
-      return this.translator.t("spotify.notConnected");
+      return this.translator.t("web.spotify.notConnected");
     }
 
     try {
       // Extract track ID from Spotify URL
       const trackId = this.extractTrackId(spotifyUrl);
       if (!trackId) {
-        return this.translator.t("spotify.invalidUrl");
+        return this.translator.t("web.spotify.invalidUrl");
       }
 
       // Get track information
@@ -102,24 +105,27 @@ class SpotifyManager {
       // Add to queue
       try {
         await this.spotifyApi.addToQueue(`spotify:track:${trackId}`);
-        return this.translator.t("spotify.songAddedToQueue", {
+        return this.translator.t("web.spotify.songAddedToQueue", {
           song: track.name,
           artists: artists,
           username: username,
         });
       } catch (queueError) {
         console.error(
-          this.translator.t("spotify.errorAddingToQueue"),
+          this.translator.t("web.spotify.errorAddingToQueue"),
           queueError
         );
-        return this.translator.t("spotify.unableToAddToQueue", {
+        return this.translator.t("web.spotify.unableToAddToQueue", {
           song: track.name,
           artists: artists,
         });
       }
     } catch (error) {
-      console.error(this.translator.t("spotify.errorRequestingSong"), error);
-      return this.translator.t("spotify.errorRequestingSongMessage");
+      console.error(
+        this.translator.t("web.spotify.errorRequestingSong"),
+        error
+      );
+      return this.translator.t("web.spotify.errorRequestingSongMessage");
     }
   }
 
@@ -155,7 +161,10 @@ class SpotifyManager {
 
       return null;
     } catch (error) {
-      console.error(this.translator.t("spotify.errorSearchingTrack"), error);
+      console.error(
+        this.translator.t("web.spotify.errorSearchingTrack"),
+        error
+      );
       return null;
     }
   }
@@ -219,7 +228,7 @@ class SpotifyManager {
       };
     } catch (error) {
       console.error(
-        this.translator.t("spotify.errorExchangingAuthCode"),
+        this.translator.t("web.spotify.errorExchangingAuthCode"),
         error
       );
       throw error;
