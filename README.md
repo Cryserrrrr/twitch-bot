@@ -10,7 +10,7 @@ A modern Twitch bot with Spotify, Apex Legends, OBS integrations and web managem
 - ✅ **Apex Legends**: Rank display, multi-platform support, Mozambique API
 - ✅ **OBS**: WebSocket connection, web interface control
 - ✅ **Fun**: Welcome messages, auto thanks, gift subs/raids, dice/flip commands
-- ✅ **Web Interface**: Modern UI, real-time management, OBS control, secure auth
+- ✅ **Web Interface**: Modern UI, real-time management, secure auth, moderator auth
 
 ## 🚀 Quick Start
 
@@ -104,21 +104,6 @@ Then generate certificates:
 ```bash
 mkcert -install
 mkcert 127.0.0.1
-```
-
-## 🚀 Production
-
-```bash
-# Install PM2
-npm install -g pm2
-
-# Start bot
-pm2 start src/index.js --name "twitch-bot"
-
-# Manage
-pm2 status
-pm2 logs twitch-bot
-pm2 restart twitch-bot
 ```
 
 ## 🐛 Troubleshooting

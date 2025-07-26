@@ -41,7 +41,7 @@ class OBSManager {
     });
 
     this.obs.on("ConnectionError", (error) => {
-      console.error("❌ OBS connection error:", error);
+      console.error("❌ OBS connection error");
       this.connected = false;
     });
 
@@ -67,7 +67,7 @@ class OBSManager {
 
       return true;
     } catch (error) {
-      console.error("❌ Error connecting to OBS:", error);
+      console.error("❌ Error connecting to OBS");
       return false;
     }
   }
