@@ -302,6 +302,25 @@ class TwitchCommands {
       throw error;
     }
   }
+
+  async refreshModeratorsList() {
+    try {
+      if (!this.twitchApiManager) {
+        throw new Error("Twitch API Manager not available");
+      }
+
+      const moderators = await this.twitchApiManager.updateModeratorsList();
+
+      return {
+        success: true,
+        count: moderators.length,
+        message: `Moderators list refreshed. Found ${moderators.length} moderators.`,
+      };
+    } catch (error) {
+      console.error("Error refreshing moderators list:", error.message);
+      throw error;
+    }
+  }
 }
 
 module.exports = TwitchCommands;

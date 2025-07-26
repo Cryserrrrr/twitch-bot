@@ -1,7 +1,8 @@
 const axios = require("axios");
 
 class TwitchAuth {
-  constructor() {
+  constructor(bot = null) {
+    this.bot = bot;
     this.clientId = process.env.TWITCH_CLIENT_ID;
     this.clientSecret = process.env.TWITCH_CLIENT_SECRET;
     this.redirectUri =
@@ -25,6 +26,7 @@ class TwitchAuth {
       "channel:read:predictions",
       "channel:read:redemptions",
       "channel:read:ads",
+      "channel:read:editors",
       "moderator:read:followers",
       "moderator:read:chatters",
       "moderator:manage:chat_messages",
@@ -122,48 +124,28 @@ class TwitchAuth {
         };
       }
 
-      // Simplified approach: if user can get a token with moderation scopes,
-      // and they're not the broadcaster, we consider they have moderation permissions
-      // This approach is more permissive but avoids API issues
+      // Check if user is a moderator using database
       let isModerator = false;
 
-      try {
-        // Try to access a simple moderation endpoint
-        await axios.get(
-          `https://api.twitch.tv/helix/moderation/moderators?broadcaster_id=${channelId}&first=1`,
-          {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              "Client-Id": this.clientId,
-            },
-          }
-        );
-
-        // If we get here, user has access to moderation endpoints
-        // We consider them a moderator or have equivalent permissions
-        isModerator = true;
-      } catch (modError) {
-        // If we get a 403 error, user is not a moderator
-        if (modError.response?.status === 403) {
+      if (this.bot && this.bot.database) {
+        try {
+          isModerator = await this.bot.database.isModerator(userId);
+        } catch (dbError) {
+          console.error(
+            "Error checking moderator in database:",
+            dbError.message
+          );
           isModerator = false;
-        } else {
-          // For other errors, try an alternative approach
+        }
+      } else {
+        // Fallback to API check if database is not available
+        if (this.bot && this.bot.twitchApiManager) {
           try {
-            // Try to access the editors endpoint
-            const editorsResponse = await axios.get(
-              `https://api.twitch.tv/helix/channels/editors?broadcaster_id=${channelId}`,
-              {
-                headers: {
-                  Authorization: `Bearer ${accessToken}`,
-                  "Client-Id": this.clientId,
-                },
-              }
+            isModerator = await this.bot.twitchApiManager.checkUserModerator(
+              userId
             );
-
-            const editors = editorsResponse.data.data;
-            isModerator = editors.some((editor) => editor.user_id === userId);
-          } catch (editorError) {
-            // If we can't access editors either, user doesn't have permissions
+          } catch (modError) {
+            console.error("Error using twitchApiManager:", modError.message);
             isModerator = false;
           }
         }

@@ -69,7 +69,7 @@ class TwitchBot {
       this.eventManager = new EventManager(this.database);
 
       // Initialize Twitch API manager
-      this.twitchApiManager = new TwitchApiManager();
+      this.twitchApiManager = new TwitchApiManager(this);
 
       // Initialize EventSub manager
       this.eventSubManager = new EventSubManager(this);
@@ -78,6 +78,9 @@ class TwitchBot {
       this.commandManager.twitchCommands.setTwitchApiManager(
         this.twitchApiManager
       );
+
+      // Make twitchCommands accessible from bot
+      this.twitchCommands = this.commandManager.twitchCommands;
 
       // Initialize web server
       this.webServer = new WebServer(this);
@@ -285,6 +288,9 @@ class TwitchBot {
         // Initialize Twitch API
         const apiReady = await this.twitchApiManager.initializeWhenReady();
         if (apiReady) {
+          // Update moderators list in database
+          await this.twitchApiManager.updateModeratorsList();
+
           // Initialize EventSub
           await this.eventSubManager.initializeWhenReady();
           console.log("✅ Twitch API and EventSub initialized successfully!");

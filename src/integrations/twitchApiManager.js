@@ -3,7 +3,8 @@ const fs = require("fs");
 const path = require("path");
 
 class TwitchApiManager {
-  constructor() {
+  constructor(bot = null) {
+    this.bot = bot;
     this.clientId = process.env.TWITCH_CLIENT_ID;
     this.clientSecret = process.env.TWITCH_CLIENT_SECRET;
     this.accessToken = null;
@@ -512,6 +513,40 @@ class TwitchApiManager {
     } catch (error) {
       console.error("Error checking moderator status:", error.message);
       return false;
+    }
+  }
+
+  // Get and store moderators list
+  async updateModeratorsList() {
+    try {
+      if (!this.bot || !this.bot.database) {
+        console.log("Database not available for storing moderators");
+        return;
+      }
+
+      const token = await this.getAccessToken();
+      const response = await axios.get(
+        `https://api.twitch.tv/helix/moderation/moderators?broadcaster_id=${this.broadcasterId}`,
+        {
+          headers: {
+            "Client-ID": this.clientId,
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const moderators = response.data.data;
+      console.log(
+        `Found ${moderators.length} moderators, storing in database...`
+      );
+
+      await this.bot.database.addModerators(moderators);
+      console.log("Moderators list updated in database");
+
+      return moderators;
+    } catch (error) {
+      console.error("Error updating moderators list:", error.message);
+      return [];
     }
   }
 

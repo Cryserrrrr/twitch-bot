@@ -14,7 +14,7 @@ class WebServer {
     this.port = process.env.WEB_PORT || 3000;
     this.webUrl = process.env.WEB_URL || "https://127.0.0.1";
     this.protocol = "http"; // Will be updated to https if SSL is used
-    this.twitchAuth = new TwitchAuth();
+    this.twitchAuth = new TwitchAuth(bot);
 
     // Store authenticated users (in production, use a proper session store)
     this.authenticatedUsers = new Map();
@@ -498,10 +498,46 @@ class WebServer {
           bannedWordsEnabled,
           allowedLinksEnabled
         );
-        res.json({ success: true, message: "Settings updated" });
+        res.json({
+          success: true,
+          message: "Moderation settings updated successfully",
+        });
       } catch (error) {
+        console.error("Error updating moderation settings:", error);
         res.status(500).json({
-          error: "Error updating settings",
+          error: "Error updating moderation settings",
+        });
+      }
+    });
+
+    // Moderators management
+    this.app.post("/api/moderators/refresh", async (req, res) => {
+      try {
+        if (!this.bot.twitchCommands) {
+          return res.status(500).json({
+            error: "Twitch commands not available",
+          });
+        }
+
+        const result = await this.bot.twitchCommands.refreshModeratorsList();
+        res.json(result);
+      } catch (error) {
+        console.error("Error refreshing moderators list:", error);
+        res.status(500).json({
+          error: "Error refreshing moderators list",
+          details: error.message,
+        });
+      }
+    });
+
+    this.app.get("/api/moderators", async (req, res) => {
+      try {
+        const moderators = await this.bot.database.getModerators();
+        res.json(moderators);
+      } catch (error) {
+        console.error("Error getting moderators:", error);
+        res.status(500).json({
+          error: "Error getting moderators list",
         });
       }
     });

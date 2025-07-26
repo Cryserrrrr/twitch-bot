@@ -76,6 +76,16 @@ class Database {
                 allowed_links_enabled BOOLEAN DEFAULT 1,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )`,
+
+      // Moderators table
+      `CREATE TABLE IF NOT EXISTS moderators (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT UNIQUE NOT NULL,
+                username TEXT NOT NULL,
+                display_name TEXT NOT NULL,
+                added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )`,
     ];
 
     for (const table of tables) {
@@ -279,9 +289,50 @@ class Database {
 
   async updateModerationSettings(bannedWordsEnabled, allowedLinksEnabled) {
     return this.run(
-      "INSERT OR REPLACE INTO moderation_settings (id, banned_words_enabled, allowed_links_enabled, updated_at) VALUES (1, ?, ?, CURRENT_TIMESTAMP)",
-      [bannedWordsEnabled ? 1 : 0, allowedLinksEnabled ? 1 : 0]
+      `UPDATE moderation_settings 
+       SET banned_words_enabled = ?, allowed_links_enabled = ?, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = 1`,
+      [bannedWordsEnabled, allowedLinksEnabled]
     );
+  }
+
+  // Moderators management
+  async clearModerators() {
+    return this.run("DELETE FROM moderators");
+  }
+
+  async addModerator(userId, username, displayName) {
+    return this.run(
+      `INSERT OR REPLACE INTO moderators (user_id, username, display_name, updated_at) 
+       VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
+      [userId, username, displayName]
+    );
+  }
+
+  async addModerators(moderatorsList) {
+    // Clear existing moderators first
+    await this.clearModerators();
+
+    // Add all moderators
+    for (const mod of moderatorsList) {
+      await this.addModerator(mod.user_id, mod.user_login, mod.user_name);
+    }
+  }
+
+  async isModerator(userId) {
+    const result = await this.get(
+      "SELECT user_id FROM moderators WHERE user_id = ?",
+      [userId]
+    );
+    return !!result;
+  }
+
+  async getModerators() {
+    return this.all("SELECT * FROM moderators ORDER BY username");
+  }
+
+  async removeModerator(userId) {
+    return this.run("DELETE FROM moderators WHERE user_id = ?", [userId]);
   }
 
   async close() {
