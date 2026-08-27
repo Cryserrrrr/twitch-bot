@@ -1,256 +1,326 @@
+"use strict";
+
+const { EventEmitter } = require("events");
 const SpotifyWebApi = require("spotify-web-api-node");
-const Translator = require("../utils/translator");
 
-class SpotifyManager {
+const config = require("../core/config");
+const logger = require("../core/logger").child("spotify");
+const TokenStore = require("../auth/tokenStore");
+
+const SCOPES = [
+  "user-read-currently-playing",
+  "user-read-playback-state",
+  "user-modify-playback-state",
+  "user-read-private",
+  "playlist-modify-public",
+  "playlist-modify-private",
+];
+
+/**
+ * Polling cadence. The fast rate is what makes an OBS overlay feel immediate;
+ * the slow one avoids hammering Spotify when nothing is playing. Both stay far
+ * below the API rate limits.
+ */
+const ACTIVE_POLL_MS = 3000;
+const IDLE_POLL_MS = 20000;
+const REFRESH_MARGIN_MS = 60000;
+
+const STATE = {
+  DISABLED: "disabled", // no client id/secret configured
+  MISSING: "missing", // never authorized
+  REVOKED: "revoked", // refresh token rejected by Spotify
+  READY: "ready",
+};
+
+/**
+ * Spotify integration.
+ *
+ * The refresh token used to live in .env and was rewritten by the web server
+ * at runtime. It now sits in data/tokens/spotify.json, and a revoked token
+ * produces one actionable warning instead of an unbounded retry loop that
+ * printed the whole Spotify error object every time.
+ */
+class SpotifyManager extends EventEmitter {
   constructor() {
-    this.spotifyApi = new SpotifyWebApi({
-      clientId: process.env.SPOTIFY_CLIENT_ID,
-      clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
-      redirectUri: process.env.SPOTIFY_REDIRECT_URI,
-    });
-
-    this.isAuthenticated = false;
+    super();
+    this.store = new TokenStore("spotify");
+    this.state = config.spotify.enabled ? STATE.MISSING : STATE.DISABLED;
     this.currentTrack = null;
-    this.lastUpdate = 0;
-    this.updateInterval = null;
-    this.translator = new Translator();
+    this.refreshTimer = null;
+    this.pollTimer = null;
+    this.polling = false;
+
+    this.api = new SpotifyWebApi({
+      clientId: config.spotify.clientId,
+      clientSecret: config.spotify.clientSecret,
+      redirectUri: config.spotify.redirectUri,
+    });
+  }
+
+  isConnected() {
+    return this.state === STATE.READY;
+  }
+
+  getStatus() {
+    return {
+      enabled: config.spotify.enabled,
+      state: this.state,
+      connected: this.isConnected(),
+      track: this.currentTrack,
+    };
   }
 
   async initialize() {
-    try {
-      if (process.env.SPOTIFY_REFRESH_TOKEN) {
-        // Set refresh token before using it
-        this.spotifyApi.setRefreshToken(process.env.SPOTIFY_REFRESH_TOKEN);
-        await this.refreshAccessToken();
-        this.startTrackUpdate();
-      } else {
-        console.log(this.translator.t("web.spotify.tokenNotConfigured"));
-      }
-    } catch (error) {
-      console.error(
-        this.translator.t("web.spotify.errorInitialization"),
-        error
-      );
+    if (!config.spotify.enabled) {
+      logger.debug("Spotify is not configured");
+      return false;
     }
+
+    const refreshToken = this.loadRefreshToken();
+    if (!refreshToken) {
+      logger.info("Spotify is not connected yet - authorize it from the dashboard");
+      this.setState(STATE.MISSING);
+      return false;
+    }
+
+    this.api.setRefreshToken(refreshToken);
+    return this.refreshAccessToken();
   }
 
-  async refreshAccessToken() {
-    try {
-      const data = await this.spotifyApi.refreshAccessToken();
-      this.spotifyApi.setAccessToken(data.body["access_token"]);
-      this.isAuthenticated = true;
+  /**
+   * Reads the stored refresh token, migrating the legacy .env value on the
+   * first run so existing setups keep working.
+   */
+  loadRefreshToken() {
+    const stored = this.store.read();
+    if (stored?.refreshToken) return stored.refreshToken;
 
-      // Schedule next refresh (1 hour)
-      setTimeout(() => {
-        this.refreshAccessToken();
-      }, 3500000); // 58 minutes
-    } catch (error) {
-      console.error(
-        this.translator.t("web.spotify.errorRefreshingToken"),
-        error
-      );
-      this.isAuthenticated = false;
-    }
-  }
-
-  async getCurrentSong() {
-    if (!this.isAuthenticated) {
-      return this.translator.t("web.spotify.notConnected");
-    }
-
-    try {
-      const response = await this.spotifyApi.getMyCurrentPlayingTrack();
-
-      if (!response.body.item) {
-        return this.translator.t("web.spotify.noMusicPlaying");
-      }
-
-      const track = response.body.item;
-      const artists = track.artists.map((artist) => artist.name).join(", ");
-
-      this.currentTrack = {
-        name: track.name,
-        artists: artists,
-        album: track.album.name,
-        url: track.external_urls.spotify,
-        duration: track.duration_ms,
-        progress: response.body.progress_ms,
-      };
-
-      return this.translator.t("web.spotify.currentSong", {
-        song: track.name,
-        artists: artists,
-        album: track.album.name,
+    const legacy = process.env.SPOTIFY_REFRESH_TOKEN;
+    if (legacy && legacy !== "your_spotify_refresh_token") {
+      logger.info("Migrating the Spotify refresh token out of .env");
+      this.store.write({
+        refreshToken: legacy,
+        updatedAt: new Date().toISOString(),
       });
-    } catch (error) {
-      console.error(
-        this.translator.t("web.spotify.errorRetrievingSong"),
-        error
-      );
-      return this.translator.t("web.spotify.errorRetrievingSongMessage");
-    }
-  }
-
-  async requestSong(spotifyUrl, username) {
-    if (!this.isAuthenticated) {
-      return this.translator.t("web.spotify.notConnected");
-    }
-
-    try {
-      // Extract track ID from Spotify URL
-      const trackId = this.extractTrackId(spotifyUrl);
-      if (!trackId) {
-        return this.translator.t("web.spotify.invalidUrl");
-      }
-
-      // Get track information
-      const trackInfo = await this.spotifyApi.getTrack(trackId);
-      const track = trackInfo.body;
-      const artists = track.artists.map((artist) => artist.name).join(", ");
-
-      // Add to queue
-      try {
-        await this.spotifyApi.addToQueue(`spotify:track:${trackId}`);
-        return this.translator.t("web.spotify.songAddedToQueue", {
-          song: track.name,
-          artists: artists,
-          username: username,
-        });
-      } catch (queueError) {
-        console.error(
-          this.translator.t("web.spotify.errorAddingToQueue"),
-          queueError
-        );
-        return this.translator.t("web.spotify.unableToAddToQueue", {
-          song: track.name,
-          artists: artists,
-        });
-      }
-    } catch (error) {
-      console.error(
-        this.translator.t("web.spotify.errorRequestingSong"),
-        error
-      );
-      return this.translator.t("web.spotify.errorRequestingSongMessage");
-    }
-  }
-
-  extractTrackId(spotifyUrl) {
-    // Support for different Spotify URL formats
-    const patterns = [
-      /spotify\.com\/intl-[a-z]{2}\/track\/([a-zA-Z0-9]+)/,
-      /spotify\.com\/track\/([a-zA-Z0-9]+)/,
-      /spotify:track:([a-zA-Z0-9]+)/,
-    ];
-
-    for (const pattern of patterns) {
-      const match = spotifyUrl.match(pattern);
-      if (match) {
-        return match[1];
-      }
+      return legacy;
     }
 
     return null;
   }
 
-  async searchTrack(query) {
-    if (!this.isAuthenticated) {
-      return null;
+  async refreshAccessToken() {
+    try {
+      const { body } = await this.api.refreshAccessToken();
+      this.api.setAccessToken(body.access_token);
+      this.setState(STATE.READY);
+
+      const ttl = (body.expires_in || 3600) * 1000;
+      this.scheduleRefresh(ttl - REFRESH_MARGIN_MS);
+      this.startPolling();
+
+      logger.info("Spotify connected");
+      return true;
+    } catch (error) {
+      const reason = error.body?.error_description || error.message;
+
+      if (error.body?.error === "invalid_grant") {
+        this.setState(STATE.REVOKED);
+        this.stopTimers();
+        logger.warn(
+          `Spotify access revoked (${reason}). Reconnect it from the dashboard`
+        );
+        return false;
+      }
+
+      logger.error("Spotify token refresh failed", error);
+      // Transient failure: try again in a minute rather than giving up.
+      this.scheduleRefresh(60000);
+      return false;
     }
+  }
+
+  scheduleRefresh(delayMs) {
+    if (this.refreshTimer) clearTimeout(this.refreshTimer);
+    this.refreshTimer = setTimeout(
+      () => this.refreshAccessToken(),
+      Math.max(delayMs, 30000)
+    );
+  }
+
+  /**
+   * Self-scheduling poll loop rather than a fixed interval, so the cadence can
+   * follow playback state instead of being locked in at start-up.
+   */
+  startPolling() {
+    if (this.polling) return;
+    this.polling = true;
+
+    const tick = async () => {
+      if (!this.polling) return;
+
+      await this.fetchCurrentTrack().catch(() => {});
+
+      const delay = this.currentTrack?.isPlaying ? ACTIVE_POLL_MS : IDLE_POLL_MS;
+      this.pollTimer = setTimeout(tick, delay);
+    };
+
+    tick();
+  }
+
+  stopTimers() {
+    this.polling = false;
+    if (this.refreshTimer) clearTimeout(this.refreshTimer);
+    if (this.pollTimer) clearTimeout(this.pollTimer);
+    this.refreshTimer = null;
+    this.pollTimer = null;
+  }
+
+  async fetchCurrentTrack() {
+    if (!this.isConnected()) return null;
 
     try {
-      const response = await this.spotifyApi.searchTracks(query, { limit: 1 });
+      const { body } = await this.api.getMyCurrentPlayingTrack();
+      const item = body?.item;
 
-      if (response.body.tracks.items.length > 0) {
-        return response.body.tracks.items[0];
+      if (!item) {
+        this.setTrack(null);
+        return null;
       }
 
-      return null;
+      this.setTrack({
+        id: item.id,
+        name: item.name,
+        artists: item.artists.map((artist) => artist.name).join(", "),
+        album: item.album?.name || "",
+        cover: item.album?.images?.[0]?.url || null,
+        url: item.external_urls?.spotify || null,
+        duration: item.duration_ms,
+        progress: body.progress_ms,
+        isPlaying: body.is_playing,
+      });
+
+      return this.currentTrack;
     } catch (error) {
-      console.error(
-        this.translator.t("web.spotify.errorSearchingTrack"),
-        error
-      );
+      if (error.statusCode === 401) {
+        await this.refreshAccessToken();
+      } else {
+        logger.debug("Could not read the current track", error);
+      }
       return null;
     }
   }
 
-  startTrackUpdate() {
-    // Update current song every 30 seconds
-    this.updateInterval = setInterval(async () => {
-      if (this.isAuthenticated) {
-        await this.getCurrentSong();
-      }
-    }, 30000);
+  /**
+   * Emits on every poll, not only on track changes: overlays interpolate the
+   * progress bar locally between updates and need a regular reference point to
+   * resync against, and pause/resume has to reach them too.
+   */
+  setTrack(track) {
+    const changed = track?.id !== this.currentTrack?.id;
+    this.currentTrack = track ? { ...track, receivedAt: Date.now() } : null;
+    this.emit("track", this.currentTrack, { changed });
   }
 
-  stopTrackUpdate() {
-    if (this.updateInterval) {
-      clearInterval(this.updateInterval);
-      this.updateInterval = null;
-    }
-  }
-
-  getCurrentTrackInfo() {
+  getCurrentTrack() {
     return this.currentTrack;
   }
 
-  // Method to generate authorization link (for initial configuration)
-  getAuthorizationUrl() {
-    const scopes = [
-      "user-read-currently-playing",
-      "user-read-playback-state",
-      "user-modify-playback-state",
-      "user-read-private",
+  extractTrackId(input) {
+    const patterns = [
+      /spotify\.com\/(?:intl-[a-z]{2}\/)?track\/([a-zA-Z0-9]+)/,
+      /spotify:track:([a-zA-Z0-9]+)/,
     ];
 
-    // Use custom redirect URI
-    const redirectUri =
-      process.env.SPOTIFY_REDIRECT_URI ||
-      "https://127.0.0.1:3000/callback/spotify";
-    const authUrl = `https://accounts.spotify.com/authorize?client_id=${
-      process.env.SPOTIFY_CLIENT_ID
-    }&response_type=code&redirect_uri=${encodeURIComponent(
-      redirectUri
-    )}&scope=${encodeURIComponent(scopes.join(" "))}`;
-
-    return authUrl;
+    for (const pattern of patterns) {
+      const match = String(input).match(pattern);
+      if (match) return match[1];
+    }
+    return null;
   }
 
-  // Method to exchange authorization code for token
-  async handleAuthorizationCode(code) {
+  /** Adds a track to the playback queue, by link or by search terms. */
+  async requestSong(query) {
+    if (!this.isConnected()) {
+      return { ok: false, reason: "not_connected" };
+    }
+
     try {
-      const data = await this.spotifyApi.authorizationCodeGrant(code);
+      let trackId = this.extractTrackId(query);
 
-      this.spotifyApi.setAccessToken(data.body["access_token"]);
-      this.spotifyApi.setRefreshToken(data.body["refresh_token"]);
+      if (!trackId) {
+        const { body } = await this.api.searchTracks(query, { limit: 1 });
+        trackId = body.tracks?.items?.[0]?.id;
+        if (!trackId) return { ok: false, reason: "not_found" };
+      }
 
-      this.isAuthenticated = true;
+      const { body: track } = await this.api.getTrack(trackId);
+      await this.api.addToQueue(`spotify:track:${trackId}`);
+
+      if (config.spotify.playlistId) {
+        await this.api
+          .addTracksToPlaylist(config.spotify.playlistId, [
+            `spotify:track:${trackId}`,
+          ])
+          .catch((error) =>
+            logger.debug("Could not add the track to the playlist", error)
+          );
+      }
 
       return {
-        accessToken: data.body["access_token"],
-        refreshToken: data.body["refresh_token"],
-        expiresIn: data.body["expires_in"],
+        ok: true,
+        track: {
+          name: track.name,
+          artists: track.artists.map((artist) => artist.name).join(", "),
+        },
       };
     } catch (error) {
-      console.error(
-        this.translator.t("web.spotify.errorExchangingAuthCode"),
-        error
-      );
-      throw error;
+      // 404 from the queue endpoint means no active Spotify device.
+      if (error.statusCode === 404) return { ok: false, reason: "no_device" };
+      logger.error("Song request failed", error);
+      return { ok: false, reason: "error" };
     }
   }
 
-  // Method to check connection status
-  isConnected() {
-    return this.isAuthenticated;
+  getAuthorizationUrl() {
+    return this.api.createAuthorizeURL(SCOPES, "spotify");
   }
 
-  // Method to cleanup resources
-  cleanup() {
-    this.stopTrackUpdate();
-    this.isAuthenticated = false;
+  /** Completes the Spotify OAuth flow and persists the refresh token. */
+  async handleAuthorizationCode(code) {
+    const { body } = await this.api.authorizationCodeGrant(code);
+
+    this.api.setAccessToken(body.access_token);
+    this.api.setRefreshToken(body.refresh_token);
+    this.store.write({
+      refreshToken: body.refresh_token,
+      updatedAt: new Date().toISOString(),
+    });
+
+    this.setState(STATE.READY);
+    this.scheduleRefresh((body.expires_in || 3600) * 1000 - REFRESH_MARGIN_MS);
+    this.startPolling();
+
+    logger.info("Spotify connected");
+    return true;
+  }
+
+  disconnect() {
+    this.stopTimers();
+    this.store.clear();
+    this.currentTrack = null;
+    this.setState(config.spotify.enabled ? STATE.MISSING : STATE.DISABLED);
+  }
+
+  setState(next) {
+    if (this.state === next) return;
+    this.state = next;
+    this.emit("state", next);
+  }
+
+  async stop() {
+    this.stopTimers();
   }
 }
 
 module.exports = SpotifyManager;
+module.exports.STATE = STATE;

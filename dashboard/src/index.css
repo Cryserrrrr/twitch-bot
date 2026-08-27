@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Light theme */
+  :root {
+    --canvas: 248 249 251;
+    --surface: 255 255 255;
+    --elevated: 255 255 255;
+    --line: 226 228 235;
+    --ink: 22 24 33;
+    --muted: 92 98 116;
+    --faint: 140 146 165;
+    --brand: 124 58 237;
+    --brand-soft: 237 233 254;
+    --positive: 16 145 92;
+    --warning: 180 118 8;
+    --danger: 200 44 60;
+  }
+
+  /* Dark theme */
+  .dark {
+    --canvas: 10 10 15;
+    --surface: 19 19 27;
+    --elevated: 26 26 36;
+    --line: 39 39 52;
+    --ink: 236 237 243;
+    --muted: 154 158 176;
+    --faint: 108 112 131;
+    --brand: 145 70 255;
+    --brand-soft: 45 27 78;
+    --positive: 52 199 133;
+    --warning: 234 179 8;
+    --danger: 244 82 96;
+  }
+
+  * {
+    @apply border-line;
+  }
+
+  body {
+    @apply bg-canvas text-ink antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  ::selection {
+    @apply bg-brand/30;
+  }
+}
+
+@layer components {
+  /* Shared focus treatment so every interactive element matches. */
+  .focus-ring {
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--line)) transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-line;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}

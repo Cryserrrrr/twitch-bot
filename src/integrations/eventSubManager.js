@@ -1,557 +1,390 @@
-const WebSocket = require("ws");
-const axios = require("axios");
+"use strict";
 
-class EventSubManager {
+const { EventEmitter } = require("events");
+const WebSocket = require("ws");
+
+const logger = require("../core/logger").child("eventsub");
+const tokenManager = require("../auth/twitchTokenManager");
+
+const DEFAULT_URL = "wss://eventsub.wss.twitch.tv/ws";
+const MAX_RECONNECT_DELAY = 60000;
+
+/**
+ * Twitch EventSub over WebSocket.
+ *
+ * Notable fixes over the previous version: `fs`/`path` were used without being
+ * required, so the readiness loop threw on its first iteration and silently
+ * spun for sixty seconds; session_reconnect ignored the URL Twitch hands out;
+ * and a client-side ping was sent even though EventSub drives keepalives.
+ */
+class EventSubManager extends EventEmitter {
   constructor(bot) {
+    super();
     this.bot = bot;
     this.ws = null;
-    this.clientId = process.env.TWITCH_CLIENT_ID;
-    this.clientSecret = process.env.TWITCH_CLIENT_SECRET;
-    this.accessToken = null;
-    this.refreshToken = null;
-    this.tokenExpiry = null;
-    this.broadcasterId = null;
     this.sessionId = null;
-    this.isConnected = false;
-    this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 5;
-    this.pingInterval = null;
+    this.connected = false;
+    this.broadcasterId = null;
     this.subscriptions = new Map();
-
-    // Load token from the same file as TwitchApiManager
-    this.loadToken();
-  }
-
-  loadToken() {
-    try {
-      const fs = require("fs");
-      const path = require("path");
-      const tokenFile = path.join(
-        __dirname,
-        "..",
-        "..",
-        "data",
-        "twitch_token.json"
-      );
-
-      if (fs.existsSync(tokenFile)) {
-        const tokenData = JSON.parse(fs.readFileSync(tokenFile, "utf8"));
-        this.accessToken = tokenData.accessToken;
-        this.refreshToken = tokenData.refreshToken;
-        this.tokenExpiry = tokenData.expiry;
-      }
-    } catch (error) {
-      console.error("Error loading token:", error.message);
-    }
-  }
-
-  async getAccessToken() {
-    // Check if we have a valid token
-    if (this.accessToken && this.tokenExpiry && Date.now() < this.tokenExpiry) {
-      return this.accessToken;
-    }
-
-    // Try to refresh the token if we have a refresh token
-    if (this.refreshToken) {
-      try {
-        await this.refreshAccessToken();
-        return this.accessToken;
-      } catch (error) {
-        console.error("Error refreshing token:", error.message);
-      }
-    }
-
-    throw new Error(
-      "No valid access token available. Please authenticate through the web interface first."
-    );
-  }
-
-  async refreshAccessToken() {
-    try {
-      const response = await axios.post(
-        "https://id.twitch.tv/oauth2/token",
-        null,
-        {
-          params: {
-            client_id: this.clientId,
-            client_secret: this.clientSecret,
-            grant_type: "refresh_token",
-            refresh_token: this.refreshToken,
-          },
-        }
-      );
-
-      this.accessToken = response.data.access_token;
-      this.refreshToken = response.data.refresh_token;
-      this.tokenExpiry = Date.now() + response.data.expires_in * 1000;
-
-      // Save token to file
-      const fs = require("fs");
-      const path = require("path");
-      const tokenFile = path.join(
-        __dirname,
-        "..",
-        "..",
-        "data",
-        "twitch_token.json"
-      );
-      const tokenData = {
-        accessToken: this.accessToken,
-        refreshToken: this.refreshToken,
-        expiry: this.tokenExpiry,
-      };
-
-      const dataDir = path.dirname(tokenFile);
-      if (!fs.existsSync(dataDir)) {
-        fs.mkdirSync(dataDir, { recursive: true });
-      }
-
-      fs.writeFileSync(tokenFile, JSON.stringify(tokenData, null, 2));
-
-      return this.accessToken;
-    } catch (error) {
-      console.error("Error refreshing Twitch access token:", error.message);
-      throw new Error("Failed to refresh access token");
-    }
-  }
-
-  async initialize(broadcasterId) {
-    this.broadcasterId = broadcasterId;
-    await this.connect();
-  }
-
-  async initializeWhenReady() {
-    let attempts = 0;
-    const maxAttempts = 60; // 60 secondes max
-    let lastTokenCheck = 0;
-
-    while (attempts < maxAttempts) {
-      try {
-        // Check if token file has been updated
-        const tokenFile = path.join(
-          __dirname,
-          "..",
-          "..",
-          "data",
-          "twitch_token.json"
-        );
-        if (fs.existsSync(tokenFile)) {
-          const stats = fs.statSync(tokenFile);
-          if (stats.mtime.getTime() > lastTokenCheck) {
-            // Token file was updated, reload it
-            this.loadToken();
-            lastTokenCheck = stats.mtime.getTime();
-            console.log("🔄 EventSub: Token file updated, reloading...");
-          }
-        }
-
-        // Wait for TwitchApiManager to be ready
-        if (this.bot.twitchApiManager.broadcasterId) {
-          this.broadcasterId = this.bot.twitchApiManager.broadcasterId;
-          await this.connect();
-          return true;
-        }
-      } catch (error) {
-        // Continue trying
-      }
-
-      attempts++;
-      await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2 seconds
-    }
-
-    console.error("❌ Failed to initialize EventSub after 60 seconds");
-    return false;
-  }
-
-  async connect() {
-    try {
-      const token = await this.getAccessToken();
-
-      // Get EventSub WebSocket URL
-      const response = await axios.get(
-        "https://api.twitch.tv/helix/eventsub/subscriptions",
-        {
-          headers: {
-            "Client-ID": this.clientId,
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      // Connect to EventSub WebSocket
-      this.ws = new WebSocket("wss://eventsub.wss.twitch.tv/ws");
-
-      this.ws.on("open", () => {
-        console.log("✅ Connected to Twitch EventSub WebSocket");
-        this.isConnected = true;
-        this.reconnectAttempts = 0;
-        this.setupPingInterval();
-      });
-
-      this.ws.on("message", (data) => {
-        this.handleMessage(JSON.parse(data.toString()));
-      });
-
-      this.ws.on("close", () => {
-        console.log("❌ Disconnected from Twitch EventSub WebSocket");
-        this.isConnected = false;
-        this.clearPingInterval();
-        this.handleReconnect();
-      });
-
-      this.ws.on("error", (error) => {
-        console.error("❌ EventSub WebSocket error:", error);
-      });
-    } catch (error) {
-      console.error("❌ Error connecting to EventSub:", error.message);
-      throw error;
-    }
-  }
-
-  setupPingInterval() {
-    this.pingInterval = setInterval(() => {
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        this.ws.send(JSON.stringify({ type: "ping" }));
-      }
-    }, 30000); // Send ping every 30 seconds
-  }
-
-  clearPingInterval() {
-    if (this.pingInterval) {
-      clearInterval(this.pingInterval);
-      this.pingInterval = null;
-    }
-  }
-
-  async handleMessage(message) {
-    try {
-      switch (message.metadata.message_type) {
-        case "session_welcome":
-          this.sessionId = message.payload.session.id;
-          console.log(`✅ EventSub session established: ${this.sessionId}`);
-          await this.createSubscriptions();
-          break;
-
-        case "session_keepalive":
-          // Keep-alive message, no action needed
-          break;
-
-        case "notification":
-          await this.handleEvent(message.payload);
-          break;
-
-        case "session_reconnect":
-          console.log("🔄 EventSub session reconnect requested");
-          await this.reconnect();
-          break;
-
-        case "revocation":
-          console.log(
-            "❌ EventSub subscription revoked:",
-            message.payload.subscription.id
-          );
-          this.subscriptions.delete(message.payload.subscription.id);
-          break;
-
-        default:
-          console.log(
-            "📨 Unknown EventSub message type:",
-            message.metadata.message_type
-          );
-      }
-    } catch (error) {
-      console.error("❌ Error handling EventSub message:", error);
-    }
-  }
-
-  async createSubscriptions() {
-    try {
-      const token = await this.getAccessToken();
-
-      // Create subscriptions for different event types
-      const subscriptions = [
-        {
-          type: "channel.follow",
-          version: "2",
-          condition: {
-            broadcaster_user_id: this.broadcasterId,
-            moderator_user_id: this.broadcasterId,
-          },
-          transport: { method: "websocket", session_id: this.sessionId },
-        },
-        {
-          type: "channel.subscribe",
-          version: "1",
-          condition: { broadcaster_user_id: this.broadcasterId },
-          transport: { method: "websocket", session_id: this.sessionId },
-        },
-        {
-          type: "channel.subscription.message",
-          version: "1",
-          condition: { broadcaster_user_id: this.broadcasterId },
-          transport: { method: "websocket", session_id: this.sessionId },
-        },
-        {
-          type: "channel.subscription.gift",
-          version: "1",
-          condition: { broadcaster_user_id: this.broadcasterId },
-          transport: { method: "websocket", session_id: this.sessionId },
-        },
-        {
-          type: "channel.cheer",
-          version: "1",
-          condition: { broadcaster_user_id: this.broadcasterId },
-          transport: { method: "websocket", session_id: this.sessionId },
-        },
-        {
-          type: "channel.raid",
-          version: "1",
-          condition: { to_broadcaster_user_id: this.broadcasterId },
-          transport: { method: "websocket", session_id: this.sessionId },
-        },
-      ];
-
-      for (const subscription of subscriptions) {
-        try {
-          const response = await axios.post(
-            "https://api.twitch.tv/helix/eventsub/subscriptions",
-            subscription,
-            {
-              headers: {
-                "Client-ID": this.clientId,
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-              },
-            }
-          );
-
-          if (response.data.data && response.data.data.length > 0) {
-            const sub = response.data.data[0];
-            this.subscriptions.set(sub.id, sub);
-            console.log(`✅ Created EventSub subscription: ${sub.type}`);
-          }
-        } catch (error) {
-          console.error(
-            `❌ Error creating subscription ${subscription.type}:`,
-            error.message
-          );
-        }
-      }
-    } catch (error) {
-      console.error("❌ Error creating EventSub subscriptions:", error.message);
-    }
-  }
-
-  async handleEvent(payload) {
-    try {
-      const event = payload.event;
-      const subscription = payload.subscription;
-
-      switch (subscription.type) {
-        case "channel.follow":
-          await this.handleFollow(event);
-          break;
-
-        case "channel.subscribe":
-          await this.handleSubscribe(event);
-          break;
-
-        case "channel.subscription.message":
-          await this.handleResub(event);
-          break;
-
-        case "channel.subscription.gift":
-          await this.handleGiftSub(event);
-          break;
-
-        case "channel.cheer":
-          await this.handleCheer(event);
-          break;
-
-        case "channel.raid":
-          await this.handleRaid(event);
-          break;
-
-        case "channel.channel_points_custom_reward_redemption.add":
-          await this.handleChannelPoints(event);
-          break;
-
-        default:
-          console.log("📨 Unknown event type:", subscription.type);
-      }
-    } catch (error) {
-      console.error("❌ Error handling event:", error);
-    }
-  }
-
-  async handleFollow(event) {
-    try {
-      const username = event.user_name;
-      const message = await this.bot.eventManager.handleFollow(username);
-
-      if (this.bot.isConnected && this.bot.client) {
-        await this.bot.client.say(`#${process.env.TWITCH_CHANNEL}`, message);
-      }
-
-      console.log(`👋 New follower: ${username}`);
-    } catch (error) {
-      console.error("❌ Error handling follow event:", error);
-    }
-  }
-
-  async handleSubscribe(event) {
-    try {
-      const username = event.user_name;
-      const message = await this.bot.eventManager.handleSubscription(
-        username,
-        event.sub_tier,
-        event.message
-      );
-
-      if (this.bot.isConnected && this.bot.client) {
-        await this.bot.client.say(`#${process.env.TWITCH_CHANNEL}`, message);
-      }
-
-      console.log(`💜 New subscriber: ${username}`);
-    } catch (error) {
-      console.error("❌ Error handling subscribe event:", error);
-    }
-  }
-
-  async handleResub(event) {
-    try {
-      const username = event.user_name;
-      const months = event.cumulative_months;
-      const message = await this.bot.eventManager.handleResub(
-        username,
-        months,
-        event.message
-      );
-
-      if (this.bot.isConnected && this.bot.client) {
-        await this.bot.client.say(`#${process.env.TWITCH_CHANNEL}`, message);
-      }
-
-      console.log(`💜 Resub: ${username} (${months} months)`);
-    } catch (error) {
-      console.error("❌ Error handling resub event:", error);
-    }
-  }
-
-  async handleGiftSub(event) {
-    try {
-      const username = event.user_name;
-      const recipient = event.is_anonymous ? "Anonymous" : event.user_name;
-      const message = await this.bot.eventManager.handleSubGift(
-        username,
-        recipient
-      );
-
-      if (this.bot.isConnected && this.bot.client) {
-        await this.bot.client.say(`#${process.env.TWITCH_CHANNEL}`, message);
-      }
-
-      console.log(`🎁 Gift sub from ${username} to ${recipient}`);
-    } catch (error) {
-      console.error("❌ Error handling gift sub event:", error);
-    }
-  }
-
-  async handleCheer(event) {
-    try {
-      const username = event.user_name;
-      const bits = event.bits;
-      const message = await this.bot.eventManager.handleBits(
-        username,
-        bits,
-        event.message
-      );
-
-      if (this.bot.isConnected && this.bot.client) {
-        await this.bot.client.say(`#${process.env.TWITCH_CHANNEL}`, message);
-      }
-
-      console.log(`💎 Cheer from ${username}: ${bits} bits`);
-    } catch (error) {
-      console.error("❌ Error handling cheer event:", error);
-    }
-  }
-
-  async handleRaid(event) {
-    try {
-      const username = event.from_broadcaster_user_name;
-      const viewers = event.viewers;
-      const message = await this.bot.eventManager.handleRaid(username, viewers);
-
-      if (this.bot.isConnected && this.bot.client) {
-        await this.bot.client.say(`#${process.env.TWITCH_CHANNEL}`, message);
-      }
-
-      console.log(`🚀 Raid from ${username} with ${viewers} viewers`);
-    } catch (error) {
-      console.error("❌ Error handling raid event:", error);
-    }
-  }
-
-  async handleChannelPoints(event) {
-    try {
-      const username = event.user_name;
-      const reward = event.reward.title;
-      const cost = event.reward.cost;
-
-      console.log(
-        `🎯 Channel points redemption: ${username} redeemed "${reward}" for ${cost} points`
-      );
-
-      // You can add custom logic here for channel points redemptions
-      // For example, trigger specific actions based on the reward
-    } catch (error) {
-      console.error("❌ Error handling channel points event:", error);
-    }
-  }
-
-  async handleReconnect() {
-    if (this.reconnectAttempts < this.maxReconnectAttempts) {
-      this.reconnectAttempts++;
-      const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
-
-      console.log(
-        `🔄 EventSub reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms...`
-      );
-
-      setTimeout(async () => {
-        try {
-          await this.connect();
-        } catch (error) {
-          console.error("❌ Error during EventSub reconnect:", error);
-          this.handleReconnect();
-        }
-      }, delay);
-    } else {
-      console.error("❌ Maximum EventSub reconnect attempts reached");
-    }
-  }
-
-  async reconnect() {
-    if (this.ws) {
-      this.ws.close();
-    }
-    await this.connect();
-  }
-
-  async disconnect() {
-    this.clearPingInterval();
-
-    if (this.ws) {
-      this.ws.close();
-    }
-
-    this.isConnected = false;
-    console.log("✅ EventSub disconnected");
+    this.reconnectAttempts = 0;
+    this.reconnectTimer = null;
+    this.keepaliveTimer = null;
+    this.keepaliveSeconds = 10;
+    this.stopped = false;
   }
 
   isConnected() {
-    return this.isConnected;
+    return this.connected;
+  }
+
+  getStatus() {
+    return {
+      connected: this.connected,
+      subscriptions: [...this.subscriptions.values()].map((sub) => sub.type),
+    };
+  }
+
+  async start(broadcasterId) {
+    this.stopped = false;
+    this.broadcasterId = broadcasterId;
+    return this.connect();
+  }
+
+  async connect(url = DEFAULT_URL) {
+    if (this.stopped) return false;
+    this.clearReconnectTimer();
+
+    if (!tokenManager.isReady() || !this.broadcasterId) {
+      logger.debug("EventSub is waiting for an authenticated account");
+      return false;
+    }
+
+    return new Promise((resolve) => {
+      const socket = new WebSocket(url);
+      this.ws = socket;
+
+      socket.on("open", () => {
+        this.reconnectAttempts = 0;
+      });
+
+      socket.on("message", (raw) => {
+        let payload;
+        try {
+          payload = JSON.parse(raw.toString());
+        } catch (error) {
+          logger.warn("Received a malformed EventSub frame", error);
+          return;
+        }
+        this.handleFrame(payload, resolve);
+      });
+
+      socket.on("close", (code) => {
+        // During a session_reconnect the previous socket closes while the new
+        // one is already live: only the current socket may change the state.
+        if (this.ws !== null && this.ws !== socket) {
+          resolve(false);
+          return;
+        }
+
+        this.ws = null;
+        this.connected = false;
+        this.clearKeepalive();
+        this.emit("disconnected");
+
+        if (!this.stopped && code !== 1000) {
+          logger.warn(`EventSub connection closed (code ${code})`);
+          this.scheduleReconnect();
+        }
+        resolve(false);
+      });
+
+      socket.on("error", (error) => {
+        logger.error("EventSub socket error", error);
+      });
+    });
+  }
+
+  async handleFrame(frame, resolve) {
+    const type = frame.metadata?.message_type;
+
+    switch (type) {
+      case "session_welcome": {
+        const session = frame.payload.session;
+        this.sessionId = session.id;
+        this.connected = true;
+        this.keepaliveSeconds = session.keepalive_timeout_seconds || 10;
+        this.resetKeepalive();
+        logger.info("EventSub session established");
+        await this.createSubscriptions();
+        this.emit("connected");
+        if (resolve) resolve(true);
+        break;
+      }
+
+      case "session_keepalive":
+        this.resetKeepalive();
+        break;
+
+      case "session_reconnect": {
+        // Twitch hands over a new URL and keeps the old socket alive briefly.
+        const nextUrl = frame.payload.session?.reconnect_url;
+        logger.info("EventSub asked for a reconnect");
+        const previous = this.ws;
+        this.ws = null;
+        await this.connect(nextUrl || DEFAULT_URL);
+        previous?.close(1000);
+        break;
+      }
+
+      case "notification":
+        this.resetKeepalive();
+        await this.dispatch(frame.payload);
+        break;
+
+      case "revocation": {
+        const sub = frame.payload.subscription;
+        logger.warn(`EventSub subscription revoked: ${sub.type} (${sub.status})`);
+        this.subscriptions.delete(sub.id);
+        break;
+      }
+
+      default:
+        logger.debug(`Unhandled EventSub frame: ${type}`);
+    }
+  }
+
+  /**
+   * Missing keepalives mean the connection is dead even though the socket
+   * still looks open, so the connection is recycled proactively.
+   */
+  resetKeepalive() {
+    this.clearKeepalive();
+    this.keepaliveTimer = setTimeout(() => {
+      logger.warn("No EventSub keepalive received, reconnecting");
+      this.ws?.close(4000);
+    }, (this.keepaliveSeconds + 5) * 1000);
+  }
+
+  clearKeepalive() {
+    if (this.keepaliveTimer) {
+      clearTimeout(this.keepaliveTimer);
+      this.keepaliveTimer = null;
+    }
+  }
+
+  buildSubscriptions() {
+    const broadcaster = this.broadcasterId;
+    const moderator = this.bot.twitchApiManager?.moderatorId || broadcaster;
+    const transport = { method: "websocket", session_id: this.sessionId };
+
+    return [
+      {
+        type: "channel.follow",
+        version: "2",
+        condition: {
+          broadcaster_user_id: broadcaster,
+          moderator_user_id: moderator,
+        },
+        transport,
+      },
+      {
+        type: "channel.subscribe",
+        version: "1",
+        condition: { broadcaster_user_id: broadcaster },
+        transport,
+      },
+      {
+        type: "channel.subscription.message",
+        version: "1",
+        condition: { broadcaster_user_id: broadcaster },
+        transport,
+      },
+      {
+        type: "channel.subscription.gift",
+        version: "1",
+        condition: { broadcaster_user_id: broadcaster },
+        transport,
+      },
+      {
+        type: "channel.cheer",
+        version: "1",
+        condition: { broadcaster_user_id: broadcaster },
+        transport,
+      },
+      {
+        type: "channel.raid",
+        version: "1",
+        condition: { to_broadcaster_user_id: broadcaster },
+        transport,
+      },
+      {
+        type: "channel.channel_points_custom_reward_redemption.add",
+        version: "1",
+        condition: { broadcaster_user_id: broadcaster },
+        transport,
+      },
+      {
+        type: "stream.online",
+        version: "1",
+        condition: { broadcaster_user_id: broadcaster },
+        transport,
+      },
+      {
+        type: "stream.offline",
+        version: "1",
+        condition: { broadcaster_user_id: broadcaster },
+        transport,
+      },
+    ];
+  }
+
+  async createSubscriptions() {
+    this.subscriptions.clear();
+    const wanted = this.buildSubscriptions();
+    const failed = [];
+
+    for (const subscription of wanted) {
+      try {
+        const { data } = await tokenManager.request(
+          "post",
+          "/eventsub/subscriptions",
+          { data: subscription }
+        );
+        const created = data.data?.[0];
+        if (created) this.subscriptions.set(created.id, created);
+      } catch (error) {
+        // Missing scopes and non-affiliate channels are expected here.
+        failed.push(subscription.type);
+        logger.debug(`Subscription refused: ${subscription.type}`, error);
+      }
+    }
+
+    logger.info(
+      `EventSub listening to ${this.subscriptions.size}/${wanted.length} event types`
+    );
+    if (failed.length) {
+      logger.warn(`Event types unavailable for this channel: ${failed.join(", ")}`);
+    }
+  }
+
+  async dispatch(payload) {
+    const type = payload.subscription?.type;
+    const event = payload.event || {};
+
+    try {
+      switch (type) {
+        case "channel.follow":
+          await this.announce("follow", { username: event.user_name });
+          break;
+
+        case "channel.subscribe":
+          if (event.is_gift) return; // Announced by the gift event instead.
+          await this.announce("subscription", {
+            username: event.user_name,
+            tier: event.tier,
+          });
+          break;
+
+        case "channel.subscription.message":
+          await this.announce("resub", {
+            username: event.user_name,
+            months: event.cumulative_months,
+            message: event.message?.text,
+          });
+          break;
+
+        case "channel.subscription.gift":
+          await this.announce("subgift", {
+            username: event.is_anonymous ? "Anonymous" : event.user_name,
+            total: event.total,
+          });
+          break;
+
+        case "channel.cheer":
+          await this.announce("cheer", {
+            username: event.is_anonymous ? "Anonymous" : event.user_name,
+            bits: event.bits,
+            message: event.message,
+          });
+          break;
+
+        case "channel.raid":
+          await this.announce("raid", {
+            username: event.from_broadcaster_user_name,
+            viewers: event.viewers,
+          });
+          break;
+
+        case "channel.channel_points_custom_reward_redemption.add":
+          this.emitActivity("redemption", {
+            username: event.user_name,
+            reward: event.reward?.title,
+            cost: event.reward?.cost,
+          });
+          break;
+
+        case "stream.online":
+          logger.info("Stream is live");
+          this.emit("stream", { live: true });
+          this.emitActivity("stream.online", {});
+          break;
+
+        case "stream.offline":
+          logger.info("Stream went offline");
+          this.emit("stream", { live: false });
+          this.emitActivity("stream.offline", {});
+          break;
+
+        default:
+          logger.debug(`Unhandled event type: ${type}`);
+      }
+    } catch (error) {
+      logger.error(`Failed to process event ${type}`, error);
+    }
+  }
+
+  /** Builds the chat announcement for an event and posts it. */
+  async announce(kind, data) {
+    const message = this.bot.eventManager.buildMessage(kind, data);
+    this.emitActivity(kind, data);
+    if (message) await this.bot.chat.say(message);
+  }
+
+  emitActivity(kind, data) {
+    this.emit("activity", { kind, data, time: Date.now() });
+  }
+
+  scheduleReconnect() {
+    if (this.stopped || this.reconnectTimer) return;
+
+    this.reconnectAttempts += 1;
+    const delay = Math.min(
+      2000 * 2 ** (this.reconnectAttempts - 1),
+      MAX_RECONNECT_DELAY
+    );
+
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.connect();
+    }, delay);
+  }
+
+  clearReconnectTimer() {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+  }
+
+  async stop() {
+    this.stopped = true;
+    this.clearReconnectTimer();
+    this.clearKeepalive();
+    if (this.ws) {
+      this.ws.close(1000);
+      this.ws = null;
+    }
+    this.connected = false;
   }
 }
 

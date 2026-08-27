@@ -1,0 +1,794 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Spotify overlay</title>
+    <style>
+      /* ---------------------------------------------------------------
+         Transparent by design: an OBS browser source composites whatever
+         this page does not paint. Nothing here may set a page background.
+         --------------------------------------------------------------- */
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        background: transparent;
+        overflow: hidden;
+        font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+        /* No font-smoothing override: forcing grayscale antialiasing thins the
+           text, and OBS already renders without subpixel rendering because the
+           background is transparent. */
+      }
+
+      body {
+        display: flex;
+        align-items: flex-start;
+      }
+
+      body[data-align="center"] {
+        justify-content: center;
+      }
+      body[data-align="right"] {
+        justify-content: flex-end;
+      }
+
+      /* Dashboard preview: centred on a neutral dark stage.
+         The background is painted here rather than left to the frame, because
+         a transparent iframe falls back to the browser's white canvas - and
+         white text on white is invisible. OBS still gets the transparent,
+         alignment-driven version. The JS may override the colour; this rule is
+         the fallback if it does not. */
+      body[data-preview="1"] {
+        align-items: center;
+        justify-content: center;
+        background: #17171d;
+      }
+
+      #root {
+        --accent: #9146ff;
+        /* Overwritten per track when the palette is taken from the cover. */
+        --album-1: var(--accent);
+        --album-2: var(--accent);
+        --scale: 1;
+        position: relative;
+        --radius: 14px;
+        --ink: #ffffff;
+        --muted: rgba(255, 255, 255, 0.66);
+        --shadow: 0 10px 34px rgba(0, 0, 0, 0.45);
+
+        font-size: calc(16px * var(--scale));
+        opacity: 0;
+        transform: translateY(0.5em);
+        transition: opacity 320ms ease, transform 320ms ease;
+        will-change: opacity, transform;
+      }
+
+      #root.is-visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      /* --- shared pieces ------------------------------------------- */
+
+      /* The cover sits in a slot so the spindle can be drawn over it: an
+         <img> cannot carry a pseudo-element of its own. */
+      .cover-slot {
+        position: relative;
+        flex: none;
+      }
+
+      .cover {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      /* Turning while playing, still when paused: the motion reports a real
+         state instead of miming a beat the overlay cannot know. */
+      /* The #root prefix is deliberate: the per-preset corner radius is written
+         with an id selector and would otherwise win, leaving a square spinning
+         on screen. */
+      #root .cover-slot.is-disc .cover {
+        border-radius: 50%;
+        animation: spin 9s linear infinite;
+      }
+
+      #root.is-paused .cover-slot.is-disc .cover {
+        animation-play-state: paused;
+      }
+
+      .cover-slot.is-disc::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        margin: auto;
+        width: 0.5em;
+        height: 0.5em;
+        border-radius: 50%;
+        background: rgba(8, 8, 12, 0.9);
+        box-shadow: 0 0 0 0.09em rgba(255, 255, 255, 0.12);
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+
+      .meta {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.15em;
+      }
+
+      .line {
+        overflow: hidden;
+        white-space: nowrap;
+        position: relative;
+      }
+
+      .line span {
+        display: inline-block;
+      }
+
+      /* Long titles drift back and forth instead of being cut off. */
+      .line.is-overflowing span {
+        animation: drift 12s ease-in-out infinite alternate;
+      }
+
+      @keyframes drift {
+        0%,
+        12% {
+          transform: translateX(0);
+        }
+        88%,
+        100% {
+          transform: translateX(var(--drift, 0px));
+        }
+      }
+
+      .title {
+        font-size: 1em;
+        font-weight: 650;
+        color: var(--ink);
+        letter-spacing: -0.01em;
+      }
+
+      .artist {
+        font-size: 0.8em;
+        font-weight: 500;
+        color: var(--muted);
+      }
+
+      .progress {
+        position: relative;
+        height: 0.2em;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.2);
+        overflow: hidden;
+      }
+
+      .progress > i {
+        position: absolute;
+        inset: 0 auto 0 0;
+        display: block;
+        width: 0%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, var(--album-2), var(--album-1));
+      }
+
+      /* --- preset: card -------------------------------------------- */
+
+      #root[data-preset="card"] .shell {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 0.85em;
+        padding: 0.7em;
+        width: 22em;
+        border-radius: var(--radius);
+        background: rgba(16, 16, 22, 0.82);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+
+      /* The album art, blown up and blurred, tints the card. */
+      #root[data-preset="card"] .wash {
+        position: absolute;
+        inset: -30%;
+        background-size: cover;
+        background-position: center;
+        filter: blur(28px) saturate(1.5);
+        opacity: 0.4;
+        transform: scale(1.2);
+      }
+
+      #root[data-preset="card"] .shell > *:not(.wash) {
+        position: relative;
+      }
+
+      #root[data-preset="card"] .cover-slot {
+        width: 3.6em;
+        height: 3.6em;
+      }
+
+      #root[data-preset="card"] .cover {
+        border-radius: calc(var(--radius) - 6px);
+      }
+
+      #root[data-preset="card"] .meta {
+        flex: 1;
+      }
+
+      #root[data-preset="card"] .progress {
+        margin-top: 0.4em;
+      }
+
+      /* --- preset: minimal ----------------------------------------- */
+
+      #root[data-preset="minimal"] .shell {
+        display: flex;
+        align-items: center;
+        gap: 0.6em;
+        padding: 0.4em 0.9em 0.4em 0.4em;
+        max-width: 20em;
+        border-radius: 999px;
+        background: rgba(16, 16, 22, 0.85);
+        box-shadow: var(--shadow);
+      }
+
+      #root[data-preset="minimal"] .wash {
+        display: none;
+      }
+
+      #root[data-preset="minimal"] .cover-slot {
+        width: 2.2em;
+        height: 2.2em;
+      }
+
+      #root[data-preset="minimal"] .cover {
+        border-radius: 999px;
+      }
+
+      #root[data-preset="minimal"] .title {
+        font-size: 0.9em;
+      }
+
+      #root[data-preset="minimal"] .artist {
+        font-size: 0.72em;
+      }
+
+      #root[data-preset="minimal"] .progress {
+        display: none;
+      }
+
+      /* --- preset: bar --------------------------------------------- */
+
+      #root[data-preset="bar"] {
+        width: 100%;
+      }
+
+      #root[data-preset="bar"] .shell {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 0.8em;
+        padding: 0.55em 1em;
+        width: 100%;
+        background: rgba(12, 12, 18, 0.9);
+        overflow: hidden;
+      }
+
+      #root[data-preset="bar"] .wash {
+        display: none;
+      }
+
+      #root[data-preset="bar"] .cover-slot {
+        width: 2.6em;
+        height: 2.6em;
+      }
+
+      #root[data-preset="bar"] .cover {
+        border-radius: 6px;
+      }
+
+      #root[data-preset="bar"] .meta {
+        flex: 1;
+      }
+
+      /* The progress becomes the underline of the whole bar. */
+      #root[data-preset="bar"] .progress {
+        position: absolute;
+        inset: auto 0 0 0;
+        height: 0.18em;
+        border-radius: 0;
+      }
+
+      /* --- preset: text -------------------------------------------- */
+
+      #root[data-preset="text"] .shell {
+        display: flex;
+        align-items: center;
+        gap: 0.55em;
+        padding: 0.2em 0;
+        max-width: 26em;
+      }
+
+      #root[data-preset="text"] .wash,
+      #root[data-preset="text"] .cover-slot {
+        display: none;
+      }
+
+      #root[data-preset="text"] .meta {
+        flex-direction: row;
+        align-items: baseline;
+        gap: 0.45em;
+      }
+
+      #root[data-preset="text"] .title,
+      #root[data-preset="text"] .artist {
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+      }
+
+      #root[data-preset="text"] .progress {
+        display: none;
+      }
+
+      /* --- optional pieces ----------------------------------------- */
+
+      #root[data-cover="off"] .cover-slot,
+      #root[data-cover="off"] .wash {
+        display: none;
+      }
+
+      #root[data-progress="off"] .progress {
+        display: none;
+      }
+
+      #root[data-artist="off"] .artist {
+        display: none;
+      }
+    </style>
+  </head>
+  <body data-align="left">
+    <div id="root" data-preset="card">
+      <div class="shell">
+        <div class="wash"></div>
+        <div class="cover-slot"><img class="cover" alt="" /></div>
+        <div class="meta">
+          <div class="line title"><span></span></div>
+          <div class="line artist"><span></span></div>
+          <div class="progress"><i></i></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (() => {
+        const root = document.getElementById("root");
+        const coverSlot = root.querySelector(".cover-slot");
+        const cover = root.querySelector(".cover");
+        const wash = root.querySelector(".wash");
+        const titleLine = root.querySelector(".title");
+        const artistLine = root.querySelector(".artist");
+        const title = titleLine.querySelector("span");
+        const artist = artistLine.querySelector("span");
+        const bar = root.querySelector(".progress > i");
+
+        const params = new URLSearchParams(window.location.search);
+
+        /**
+         * Preview mode, used by the dashboard. It stands in a sample track when
+         * nothing is playing and never auto-hides, so the overlay can be styled
+         * without music running. OBS never gets this flag.
+         */
+        const isPreview = params.get("preview") === "1";
+
+        if (isPreview) {
+          document.body.dataset.preview = "1";
+
+          // Optional override from the dashboard; the stylesheet already
+          // provides the default stage colour.
+          const background = params.get("bg");
+          if (background) {
+            document.documentElement.style.background = background;
+            document.body.style.background = background;
+          }
+        }
+
+        const SAMPLE_COVER =
+          "data:image/svg+xml;utf8," +
+          encodeURIComponent(
+            // Explicit dimensions: createImageBitmap refuses an SVG without an
+            // intrinsic size, which would leave the sample without a palette.
+            `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
+               <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+                 <stop offset="0" stop-color="#6d3bd6"/><stop offset="1" stop-color="#c2410c"/>
+               </linearGradient></defs>
+               <rect width="120" height="120" fill="url(#g)"/>
+               <circle cx="60" cy="60" r="26" fill="rgba(0,0,0,0.35)"/>
+               <circle cx="60" cy="60" r="7" fill="rgba(255,255,255,0.85)"/>
+             </svg>`
+          );
+
+        function sampleTrack(serverTime) {
+          return {
+            id: "preview-sample",
+            name: params.get("sampleTitle") || "Sample track",
+            artists: params.get("sampleArtist") || "Sample artist",
+            album: "",
+            cover: SAMPLE_COVER,
+            duration: 214000,
+            progress: 78000,
+            isPlaying: true,
+            receivedAt: serverTime,
+          };
+        }
+
+        let config = null;
+        let track = null;
+        /** Progress in ms at `anchor`, and the local clock reading taken then. */
+        let progressAtAnchor = 0;
+        let anchor = 0;
+        let revealTimer = null;
+        let lastTrackId = null;
+
+        // --- cover palette --------------------------------------------
+
+        function rgbToHsl(r, g, b) {
+          const red = r / 255;
+          const green = g / 255;
+          const blue = b / 255;
+          const max = Math.max(red, green, blue);
+          const min = Math.min(red, green, blue);
+          const lightness = (max + min) / 2;
+          const delta = max - min;
+
+          if (delta === 0) return [0, 0, lightness];
+
+          const saturation =
+            lightness > 0.5 ? delta / (2 - max - min) : delta / (max + min);
+
+          let hue;
+          if (max === red) hue = ((green - blue) / delta + (green < blue ? 6 : 0)) / 6;
+          else if (max === green) hue = ((blue - red) / delta + 2) / 6;
+          else hue = ((red - green) / delta + 4) / 6;
+
+          return [hue, saturation, lightness];
+        }
+
+        function hueGap(a, b) {
+          const gap = Math.abs(a - b);
+          return Math.min(gap, 1 - gap);
+        }
+
+        /** Forces a colour into a band that stays readable on a dark card. */
+        function toReadableCss({ h, s, l }) {
+          const saturation = Math.min(Math.max(s, 0.45), 0.95);
+          const lightness = Math.min(Math.max(l, 0.52), 0.68);
+          return `hsl(${(h * 360).toFixed(1)} ${(saturation * 100).toFixed(
+            0
+          )}% ${(lightness * 100).toFixed(0)}%)`;
+        }
+
+        /**
+         * Groups the cover's pixels into hue buckets and returns the two
+         * strongest, ignoring greys and near-black/near-white so a dark sleeve
+         * does not yield a muddy palette.
+         */
+        function pickColors(pixels) {
+          const buckets = new Map();
+          let sumR = 0;
+          let sumG = 0;
+          let sumB = 0;
+          let counted = 0;
+
+          for (let i = 0; i < pixels.length; i += 4) {
+            if (pixels[i + 3] < 200) continue;
+
+            sumR += pixels[i];
+            sumG += pixels[i + 1];
+            sumB += pixels[i + 2];
+            counted += 1;
+
+            const [h, s, l] = rgbToHsl(pixels[i], pixels[i + 1], pixels[i + 2]);
+            if (s < 0.12 || l < 0.06 || l > 0.95) continue;
+
+            const weight = s * (1 - Math.abs(l - 0.55) * 1.4);
+            if (weight <= 0) continue;
+
+            const key = Math.round(h * 24) % 24;
+            const bucket = buckets.get(key) || { weight: 0, h: 0, s: 0, l: 0 };
+            bucket.weight += weight;
+            bucket.h += h * weight;
+            bucket.s += s * weight;
+            bucket.l += l * weight;
+            buckets.set(key, bucket);
+          }
+
+          const ranked = [...buckets.values()]
+            .map((bucket) => ({
+              weight: bucket.weight,
+              h: bucket.h / bucket.weight,
+              s: bucket.s / bucket.weight,
+              l: bucket.l / bucket.weight,
+            }))
+            .sort((a, b) => b.weight - a.weight);
+
+          // Very dark or near-monochrome sleeves fill no bucket. Rather than
+          // dropping back to the fixed accent, the average colour is pushed
+          // into the readable band so the widget still follows the artwork.
+          if (!ranked.length) {
+            if (!counted) return null;
+
+            const [h, s, l] = rgbToHsl(
+              sumR / counted,
+              sumG / counted,
+              sumB / counted
+            );
+
+            // A genuinely monochrome sleeve carries no hue to borrow; inventing
+            // one would be arbitrary, so the chosen accent takes over.
+            if (s < 0.08) return null;
+
+            const base = { h, s, l };
+            return [
+              toReadableCss(base),
+              toReadableCss({ ...base, h: (h + 0.08) % 1 }),
+            ];
+          }
+
+          const primary = ranked[0];
+          // A companion far enough round the wheel to read as a second colour.
+          const secondary =
+            ranked.find((entry) => hueGap(entry.h, primary.h) > 0.08) || {
+              ...primary,
+              h: (primary.h + 0.08) % 1,
+            };
+
+          return [toReadableCss(primary), toReadableCss(secondary)];
+        }
+
+        /**
+         * Reads the sleeve through fetch rather than an <img> element.
+         *
+         * Loading the same URL into an image first without CORS and then with
+         * it makes the browser reuse the cached, header-less response, which
+         * taints the canvas and makes getImageData throw. A blob decoded with
+         * createImageBitmap is always same-origin, so it never taints.
+         */
+        async function extractPalette(url) {
+          try {
+            const response = await fetch(url, { mode: "cors" });
+            if (!response.ok) return null;
+
+            const bitmap = await createImageBitmap(await response.blob());
+
+            const size = 24;
+            const canvas = document.createElement("canvas");
+            canvas.width = size;
+            canvas.height = size;
+
+            const context = canvas.getContext("2d", { willReadFrequently: true });
+            context.drawImage(bitmap, 0, 0, size, size);
+            bitmap.close();
+
+            return pickColors(context.getImageData(0, 0, size, size).data);
+          } catch (error) {
+            // Blocked, offline or undecodable: the accent colour stands in.
+            return null;
+          }
+        }
+
+        function resetPalette() {
+          root.style.removeProperty("--album-1");
+          root.style.removeProperty("--album-2");
+        }
+
+        async function applyPalette(next) {
+          if (!config || config.progressColor !== "album" || !next || !next.cover) {
+            resetPalette();
+            return;
+          }
+
+          const requested = next.id;
+          const palette = await extractPalette(next.cover);
+
+          // A newer track may have arrived while the image was decoding.
+          if (requested !== lastTrackId) return;
+
+          if (!palette) {
+            resetPalette();
+            return;
+          }
+
+          root.style.setProperty("--album-1", palette[0]);
+          root.style.setProperty("--album-2", palette[1]);
+        }
+
+        // --- rendering ------------------------------------------------
+
+        function applyConfig(next) {
+          const paletteChanged =
+            config && config.progressColor !== next.progressColor;
+          config = next;
+          root.dataset.preset = next.preset;
+          root.dataset.cover = next.showCover ? "on" : "off";
+          root.dataset.progress = next.showProgress ? "on" : "off";
+          root.dataset.artist = next.showArtist ? "on" : "off";
+          root.style.setProperty("--accent", next.accent);
+          root.style.setProperty("--scale", next.scale / 100);
+          root.style.opacity = "";
+          document.body.dataset.align = next.align;
+          root.style.filter = `opacity(${next.opacity}%)`;
+
+          updateDisc();
+
+          // Toggling the setting has to repaint without waiting for a new track.
+          if (paletteChanged) {
+            if (next.progressColor === "album") applyPalette(track);
+            else resetPalette();
+          }
+        }
+
+        function setVisible(visible) {
+          root.classList.toggle("is-visible", visible);
+        }
+
+        /** The record look is opt-in and only makes sense with artwork. */
+        function updateDisc() {
+          coverSlot.classList.toggle(
+            "is-disc",
+            Boolean(config && config.spinCover && track && track.cover)
+          );
+        }
+
+        /** Marks a line as overflowing so the drift animation kicks in. */
+        function measure(line) {
+          const span = line.querySelector("span");
+          line.classList.remove("is-overflowing");
+          span.style.removeProperty("--drift");
+
+          const overflow = span.scrollWidth - line.clientWidth;
+          if (overflow > 4) {
+            span.style.setProperty("--drift", `${-overflow - 2}px`);
+            line.classList.add("is-overflowing");
+          }
+        }
+
+        function renderTrack(next, serverTime) {
+          const isNewTrack = next && next.id !== lastTrackId;
+
+          if (next) {
+            if (isNewTrack) {
+              title.textContent = next.name;
+              artist.textContent = next.artists;
+
+              if (next.cover) {
+                cover.src = next.cover;
+                wash.style.backgroundImage = `url("${next.cover}")`;
+              } else {
+                cover.removeAttribute("src");
+                wash.style.backgroundImage = "";
+              }
+
+              // Measured after layout so the widths are real.
+              requestAnimationFrame(() => {
+                measure(titleLine);
+                measure(artistLine);
+              });
+            }
+
+            root.classList.toggle("is-paused", !next.isPlaying);
+
+            // Compensate for the delay between Spotify's answer and this frame.
+            const lag = Math.max(0, serverTime - (next.receivedAt || serverTime));
+            progressAtAnchor = Math.min(next.progress + lag, next.duration);
+            anchor = performance.now();
+          }
+
+          track = next;
+          lastTrackId = next ? next.id : null;
+          updateDisc();
+
+          if (isNewTrack) applyPalette(next);
+
+          updateVisibility(isNewTrack);
+        }
+
+        function updateVisibility(isNewTrack) {
+          if (!config) return;
+
+          // In the dashboard preview the overlay stays put: the hide rules and
+          // the reveal countdown would leave the panel empty while configuring.
+          if (isPreview) {
+            setVisible(true);
+            return;
+          }
+
+          const idle = !track;
+          const paused = track && !track.isPlaying;
+
+          if ((idle && config.hideWhenIdle) || (paused && config.hideWhenPaused)) {
+            clearTimeout(revealTimer);
+            setVisible(false);
+            return;
+          }
+
+          if (config.mode === "always") {
+            setVisible(true);
+            return;
+          }
+
+          // Reveal mode: show on each new track, then fold away.
+          if (isNewTrack) {
+            setVisible(true);
+            clearTimeout(revealTimer);
+            revealTimer = setTimeout(
+              () => setVisible(false),
+              config.revealSeconds * 1000
+            );
+          }
+        }
+
+        /**
+         * The server only polls Spotify every few seconds, so the bar is
+         * advanced locally and resynchronised on each update. Without this it
+         * would visibly jump.
+         */
+        function tick() {
+          if (track && track.duration > 0) {
+            const elapsed = track.isPlaying ? performance.now() - anchor : 0;
+            const position = Math.min(progressAtAnchor + elapsed, track.duration);
+            bar.style.width = `${(position / track.duration) * 100}%`;
+          } else {
+            bar.style.width = "0%";
+          }
+          requestAnimationFrame(tick);
+        }
+
+        // --- transport ------------------------------------------------
+
+        function connect() {
+          // Derived from the current path, not hard-coded: the same page is
+          // served both at /spotify on the overlay port and at
+          // /overlay/spotify on the dashboard, which hosts the live preview.
+          const base = window.location.pathname.replace(/\/+$/, "");
+          const source = new EventSource(
+            `${base}/stream${window.location.search}`
+          );
+
+          source.onmessage = (event) => {
+            const state = JSON.parse(event.data);
+            applyConfig(state.config);
+
+            const next =
+              state.track || (isPreview ? sampleTrack(state.serverTime) : null);
+            renderTrack(next, state.serverTime);
+          };
+
+          // EventSource retries on its own; this only guards a hard failure.
+          source.onerror = () => {
+            if (source.readyState === EventSource.CLOSED) {
+              setTimeout(connect, 3000);
+            }
+          };
+        }
+
+        connect();
+        requestAnimationFrame(tick);
+      })();
+    </script>
+  </body>
+</html>

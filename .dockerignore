@@ -1,0 +1,12 @@
+node_modules
+dashboard/node_modules
+dashboard/dist
+data
+.env
+.env.*
+*.pem
+.git
+.gitignore
+README.md
+LICENSE
+*.log

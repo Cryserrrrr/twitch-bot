@@ -1,154 +1,217 @@
-# 🤖 Complete Twitch Bot
+# Twitch bot
 
-A modern Twitch bot with Spotify, Apex Legends, OBS integrations and web management interface.
+Chat bot and web console for a single Twitch channel: custom commands, automatic
+moderation, timed announcements, event alerts, plus Spotify, OBS Studio and Apex
+Legends integrations.
 
-## ✨ Features
-
-- ✅ **Core**: Auto Twitch connection, reconnection, OAuth, custom commands, SQLite, multi-language
-- ✅ **Moderation**: Banned words, link blocking, spam protection, manual commands, web interface
-- ✅ **Spotify**: Current song display, song requests, auto OAuth refresh
-- ✅ **Apex Legends**: Rank display, multi-platform support, Mozambique API
-- ✅ **OBS**: WebSocket connection, web interface control
-- ✅ **Fun**: Welcome messages, auto thanks, gift subs/raids, dice/flip commands
-- ✅ **Web Interface**: Modern UI, real-time management, secure auth, moderator auth
-
-## 🚀 Quick Start
-
-### 1. Install dependencies
-
-```bash
-npm install
+```
+src/          bot (Node.js, CommonJS)
+dashboard/    web console (React, Vite, TypeScript, Tailwind)
+data/         database and OAuth tokens - never commit this folder
 ```
 
-### 2. Automated setup (Recommended)
+## Requirements
+
+- Node.js 18 or newer
+- A Twitch application: <https://dev.twitch.tv/console/apps>
+- `mkcert` for the local HTTPS certificate (Twitch refuses plain HTTP redirects)
+
+## Install
 
 ```bash
-npm run setup
-```
-
-### 3. Get tokens
-
-- **Twitch**: [https://antiscuff.com/oauth/](https://antiscuff.com/oauth/)
-- **Spotify** (optional): [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
-- **Apex** (optional): [mozambiquehe.re](https://mozambiquehe.re)
-
-### 4. Start the bot
-
-```bash
+npm run install:all     # bot + dashboard dependencies
+cp env.example .env     # then fill it in
+npm run build           # compiles the dashboard into dashboard/dist
 npm start
 ```
 
-### 5. Access web interface (localhost)
+Open <https://127.0.0.1:3000> and sign in with Twitch.
 
-```
-https://127.0.0.1:3000 (HTTPS) or http://127.0.0.1:3000 (HTTP)
-```
-
-## 🌍 Languages
-
-- 🇺🇸 **English** (default)
-- 🇫🇷 **French**
-
-Configure in `.env`: `LANGUAGE=en` or `LANGUAGE=fr`
-
-## 📋 Commands
-
-### Fun
-
-- `!dice` - Roll D100
-- `!flip` - Heads/tails
-
-### Spotify
-
-- `!song` - Current song
-- `!request <link>` - Add to playlist
-
-### Apex
-
-- `!apexrank` - Current rank
-
-### Moderation (mods only)
-
-- `!addcom <name> <content>` - Add command
-- `!delcom <name>` - Delete command
-- `!timeout <user> <seconds> [reason]` - Timeout user
-- `!ban <user> [reason]` - Ban user
-- `!unban <user>` - Unban user
-
-## 🛠️ HTTPS Setup (Optional)
-
-Install mkcert for local HTTPS:
-
-**Windows:**
-
-```bash
-choco install mkcert
-```
-
-**macOS:**
-
-```bash
-brew install mkcert
-```
-
-**Linux:**
-
-```bash
-sudo apt install libnss3-tools
-wget -O mkcert https://github.com/FiloSottile/mkcert/releases/download/v1.4.4/mkcert-v1.4.4-linux-amd64
-chmod +x mkcert && sudo mv mkcert /usr/local/bin/
-```
-
-Then generate certificates:
+### HTTPS certificate
 
 ```bash
 mkcert -install
 mkcert 127.0.0.1
 ```
 
-## 🐛 Troubleshooting
+Run this from the bot folder: it produces `127.0.0.1.pem` and `127.0.0.1-key.pem`,
+which the server picks up automatically. Without them the server falls back to
+HTTP and the Twitch login will not work.
 
-### Common issues:
+### Twitch application settings
 
-1. **Bot won't connect**: Check Twitch OAuth token
-2. **Spotify not working**: Verify refresh token
-3. **OBS not responding**: Check obs-websocket installation
-4. **Database corrupted**: Delete `data/bot.db` and restart
-5. **HTTPS issues**: Reinstall mkcert certificates
+In the developer console, set the OAuth Redirect URL to exactly:
 
-## 📁 Project Structure
+```
+https://127.0.0.1:3000/callback/twitch
+```
+
+## Authentication
+
+There is no OAuth token to paste into `.env` any more. Two separate flows run
+through the console:
+
+- **Sign in** — the broadcaster or any channel moderator opens the console. Asks
+  for a single read-only scope.
+- **Connect the bot account** — grants the full scope set and stores the token
+  the bot uses for chat, Helix and EventSub. Only accepted for the channel owner.
+
+Tokens live in `data/tokens/` and are refreshed automatically. If Twitch rejects
+a refresh (password change, access revoked), the console shows it and one click
+reconnects the account.
+
+## Commands
+
+Every built-in command is a module in `src/commands/builtin/`. A module declares
+its name, aliases, permission and cooldown, and the dispatcher wires it up at
+startup:
+
+```js
+module.exports = {
+  name: "shoutout",
+  aliases: ["so"],
+  permission: "moderator",
+  cooldown: 5,
+  async run({ args, reply, t, bot }) {
+    await reply(`Go follow twitch.tv/${args[0]}`);
+  },
+};
+```
+
+Built-ins: `ping` `dice` `flip` `help` `song` `request` `apexrank` `uptime`
+`title` `category` `commercial` `snooze` `timeout` `ban` `unban` `delete`
+`addcom` `editcom` `delcom`.
+
+Custom commands are managed from the console or with `!addcom`, and support the
+`{user}`, `{channel}` and `{count}` placeholders.
+
+## Moderation
+
+Three filters, each toggled from the console: banned words (delete, timeout or
+ban per word), a link allowlist, and an all-caps filter. Moderators, VIPs and
+subscribers are never acted on. Deletions remove the exact message rather than
+issuing a one-second timeout.
+
+## Integrations
+
+| Integration | Needs | Notes |
+|---|---|---|
+| Spotify | `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET` | Connect it from the console; the refresh token is stored in `data/tokens/` |
+| OBS Studio | `OBS_HOST`, `OBS_PASSWORD` | Tools > WebSocket Server Settings; the bot reconnects on its own |
+| Apex Legends | `APEX_API_KEY`, `APEX_USERNAME` | <https://portal.mozambiquehe.re> |
+
+Every integration is optional. A missing one is reported as disabled and the rest
+keeps running.
+
+## OBS overlays
+
+The **Overlays** page of the console gives you a browser source URL for the
+Spotify now-playing overlay. Copy it into OBS (Sources > Browser) and set the
+source width and height to the dimensions the page shows.
+
+Never stretch the source on the canvas: OBS renders a browser source at its
+configured resolution and scaling it up enlarges a bitmap, which is what makes
+an overlay look blurry. To change the size, move the **Size** slider — the page
+re-renders at the new size and stays sharp — then copy the updated dimensions
+onto the source.
+
+Four styles — card, pill, bar, text only — plus accent colour, size, opacity,
+alignment, and a choice between staying on screen permanently or revealing
+itself for a few seconds on every track change. Changes apply live: the source
+updates in OBS while you drag the sliders.
+
+Overlays are served over plain HTTP on their own port (`OVERLAY_PORT`, default
+3001) rather than through the dashboard. OBS's embedded browser regularly
+refuses a self-signed certificate, and it cannot send an authentication header;
+access is gated by a generated key in the URL instead, and the listener stays on
+the loopback interface. Regenerating the key from the console invalidates the
+old URL.
+
+## Deploying with Coolify
+
+The repository holds both the bot and the dashboard, and the `Dockerfile` at the
+root builds the two together — no monorepo tooling required.
+
+In Coolify, create an **Application** from this repository and pick the
+**Dockerfile** build pack. Then:
+
+**1. Environment variables.** Copy your `.env`, and add:
+
+```
+PUBLIC_URL=https://bot.your-domain.com
+```
+
+Leave `TWITCH_REDIRECT_URI` and `SPOTIFY_REDIRECT_URI` **empty**: they are
+derived from `PUBLIC_URL`. A leftover `https://127.0.0.1:3000/...` value is the
+most likely reason a deployed login fails.
+
+**2. Persistent storage.** Mount a volume on `/app/data`. The SQLite database,
+the OAuth tokens and the overlay key live there; without it every redeploy logs
+the bot out and wipes its commands.
+
+**3. Port.** Expose `3000`. Coolify terminates TLS, so the container serves
+plain HTTP — that is expected and the bot says so in its logs. The overlays are
+served from the same port under `/overlay`, so nothing else needs exposing.
+
+**4. Redirect URLs.** Register `https://bot.your-domain.com/callback/twitch` on
+the Twitch developer console, and the matching `/callback/spotify` on the
+Spotify dashboard. Both must match character for character.
+
+Once deployed, open the dashboard, connect the bot account, and reconnect
+Spotify — tokens do not travel with the code.
+
+### OBS will not work on a remote host
+
+The OBS integration talks to obs-websocket on your own machine. A bot running on
+a VPS cannot reach it, and exposing obs-websocket to the internet is not worth
+the risk. Leave `OBS_HOST` empty in production: the integration reports itself
+as disabled and everything else keeps running.
+
+If you want OBS control, run the bot on the streaming machine instead. Chat,
+moderation, commands, EventSub, Spotify and the overlays are all happy on a VPS.
+
+## Development
+
+```bash
+npm run dev         # bot with reload on change
+npm run dashboard   # dashboard on http://localhost:5173, proxying the bot API
+```
+
+Set `LOG_LEVEL=debug` in `.env` for verbose logs, including full stack traces,
+and `BOT_CHAT_ENABLED=false` to run everything except the chat connection —
+handy for working on an overlay, or for running a second instance alongside a
+live one without the bot answering twice.
+
+## Layout
 
 ```
 src/
-├── index.js              # Main entry
-├── commands/             # All bot commands
-├── moderation/           # Moderation system
-├── integrations/         # Spotify, Apex, OBS
-├── web/                  # Web interface
-├── config/               # Configuration
-├── locales/              # Translations
-└── utils/                # Utilities
+├── index.js            entry point and startup summary
+├── core/               bot lifecycle, config, logger, settings cache
+├── auth/               Twitch token manager and token files
+├── chat/               IRC client with token-aware reconnection
+├── commands/           dispatcher + builtin/ modules
+├── moderation/         filters and timed announcements
+├── integrations/       Helix, EventSub, Spotify, OBS, Apex
+├── events/             event announcements
+├── overlays/           OBS browser sources and their configuration
+├── web/                HTTP server, REST routes, sessions, WebSocket feed
+└── locales/            chat messages in French and English
 ```
 
-## 🔒 Security
+## Troubleshooting
 
-- Environment variables for tokens
-- Permission validation
-- SQL injection protection
-- Security headers
-- CORS configured
+**`Login authentication failed`** — the account is not connected. Open the
+console and use "Connect the bot account".
 
-## 📞 Support
+**Nothing happens on the OAuth redirect** — the redirect URL registered on Twitch
+must match `TWITCH_REDIRECT_URI` character for character, HTTPS included.
 
-- GitHub issues
-- [Discord](https://discord.gg/w7xDNMBtNG)
+**"Dashboard build not found"** — run `npm run build`.
 
-## 🚧 Still need to test
+**Moderation does nothing** — the Twitch API needs the bot account connected;
+check the Twitch API line in the console sidebar.
 
-- Recurent messages
-- Auto thanks
-- Ads management
+## Licence
 
----
-
-**Happy streaming! 🎮🎧**
+MIT

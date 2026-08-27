@@ -1,178 +1,96 @@
-const Translator = require("../utils/translator");
+"use strict";
 
+const logger = require("../core/logger").child("recurring");
+
+/**
+ * Timed announcements.
+ *
+ * Timers only run while the stream is live, and the live flag now comes from
+ * EventSub instead of an OBS call issued on every chat message.
+ */
 class RecurringMessageManager {
-  constructor() {
-    this.database = null;
-    this.timers = new Map();
-    this.isStreamActive = false;
-    this.translator = new Translator();
-  }
-
-  async setDatabase(database) {
+  constructor({ database, send }) {
     this.database = database;
-    await this.loadRecurringMessages();
+    this.send = send;
+    this.messages = [];
+    this.timers = new Map();
+    this.live = false;
   }
 
-  async loadRecurringMessages() {
-    if (!this.database) {
-      throw new Error(
-        this.translator.t("moderation.manager.databaseNotInitialized")
-      );
-    }
-
+  async load() {
     try {
-      const messages = await this.database.getRecurringMessages();
-      this.messages = messages;
+      this.messages = await this.database.getRecurringMessages();
     } catch (error) {
-      console.error(this.translator.t("recurring.errorLoadingMessages"), error);
+      logger.error("Could not load recurring messages", error);
       this.messages = [];
     }
-  }
-
-  setStreamStatus(isActive) {
-    this.isStreamActive = isActive;
-    if (isActive) {
-      this.startAllTimers();
-    } else {
-      this.stopAllTimers();
-    }
-  }
-
-  startAllTimers() {
-    if (!this.isStreamActive) return;
-
-    this.messages.forEach((message) => {
-      if (message.enabled) {
-        this.startTimer(message);
-      }
-    });
-  }
-
-  stopAllTimers() {
-    this.timers.forEach((timer) => {
-      clearInterval(timer);
-    });
-    this.timers.clear();
-  }
-
-  startTimer(message) {
-    if (this.timers.has(message.id)) {
-      clearInterval(this.timers.get(message.id));
-    }
-
-    const timer = setInterval(async () => {
-      if (this.isStreamActive && this.onMessageCallback) {
-        await this.onMessageCallback(message.message);
-        await this.database.updateLastSent(message.id);
-      }
-    }, message.interval_minutes * 60 * 1000);
-
-    this.timers.set(message.id, timer);
-  }
-
-  stopTimer(messageId) {
-    if (this.timers.has(messageId)) {
-      clearInterval(this.timers.get(messageId));
-      this.timers.delete(messageId);
-    }
-  }
-
-  async addMessage(message, intervalMinutes) {
-    if (!this.database) {
-      throw new Error(
-        this.translator.t("moderation.manager.databaseNotInitialized")
-      );
-    }
-
-    try {
-      const result = await this.database.addRecurringMessage(
-        message,
-        intervalMinutes
-      );
-      const newMessage = {
-        id: result.id,
-        message,
-        interval_minutes: intervalMinutes,
-        enabled: 1,
-        created_at: new Date().toISOString(),
-      };
-
-      this.messages.push(newMessage);
-
-      if (this.isStreamActive && newMessage.enabled) {
-        this.startTimer(newMessage);
-      }
-
-      return this.translator.t("recurring.messageAdded");
-    } catch (error) {
-      console.error(this.translator.t("recurring.errorAddingMessage"), error);
-      throw error;
-    }
-  }
-
-  async updateMessage(id, message, intervalMinutes, enabled) {
-    if (!this.database) {
-      throw new Error(
-        this.translator.t("moderation.manager.databaseNotInitialized")
-      );
-    }
-
-    try {
-      await this.database.updateRecurringMessage(
-        id,
-        message,
-        intervalMinutes,
-        enabled
-      );
-
-      const messageIndex = this.messages.findIndex((m) => m.id === id);
-      if (messageIndex !== -1) {
-        this.messages[messageIndex] = {
-          ...this.messages[messageIndex],
-          message,
-          interval_minutes: intervalMinutes,
-          enabled: enabled ? 1 : 0,
-        };
-
-        if (enabled && this.isStreamActive) {
-          this.startTimer(this.messages[messageIndex]);
-        } else {
-          this.stopTimer(id);
-        }
-      }
-
-      return this.translator.t("recurring.messageUpdated");
-    } catch (error) {
-      console.error(this.translator.t("recurring.errorUpdatingMessage"), error);
-      throw error;
-    }
-  }
-
-  async deleteMessage(id) {
-    if (!this.database) {
-      throw new Error(
-        this.translator.t("moderation.manager.databaseNotInitialized")
-      );
-    }
-
-    try {
-      await this.database.deleteRecurringMessage(id);
-      this.messages = this.messages.filter((m) => m.id !== id);
-      this.stopTimer(id);
-
-      return this.translator.t("recurring.messageDeleted");
-    } catch (error) {
-      console.error(this.translator.t("recurring.errorDeletingMessage"), error);
-      throw error;
-    }
+    this.restartTimers();
+    return this.messages;
   }
 
   getMessages() {
     return this.messages;
   }
 
-  setMessageCallback(callback) {
-    this.onMessageCallback = callback;
+  setLive(live) {
+    if (this.live === live) return;
+    this.live = live;
+    this.restartTimers();
+    logger.debug(`Recurring messages ${live ? "started" : "paused"}`);
+  }
+
+  restartTimers() {
+    this.stopTimers();
+    if (!this.live) return;
+
+    for (const message of this.messages) {
+      if (message.enabled) this.startTimer(message);
+    }
+  }
+
+  startTimer(message) {
+    const intervalMs = Math.max(Number(message.interval_minutes) || 5, 1) * 60000;
+
+    const timer = setInterval(async () => {
+      if (!this.live) return;
+      try {
+        await this.send(message.message);
+        await this.database.markRecurringMessageSent(message.id);
+      } catch (error) {
+        logger.error(`Could not send recurring message ${message.id}`, error);
+      }
+    }, intervalMs);
+
+    this.timers.set(message.id, timer);
+  }
+
+  stopTimers() {
+    for (const timer of this.timers.values()) clearInterval(timer);
+    this.timers.clear();
+  }
+
+  async add(message, intervalMinutes, name = null) {
+    await this.database.addRecurringMessage(message, intervalMinutes, name);
+    return this.load();
+  }
+
+  async update(id, message, intervalMinutes, enabled) {
+    await this.database.updateRecurringMessage(
+      id,
+      message,
+      intervalMinutes,
+      enabled
+    );
+    return this.load();
+  }
+
+  async remove(id) {
+    await this.database.deleteRecurringMessage(id);
+    return this.load();
+  }
+
+  stop() {
+    this.stopTimers();
   }
 }
 
