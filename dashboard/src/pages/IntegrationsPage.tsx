@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Gamepad2, Music, Radio, RefreshCw, Video } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
@@ -45,9 +46,23 @@ function SpotifyCard() {
   const { user } = useAuth();
   const { status, track } = useRealtime();
   const [busy, setBusy] = useState(false);
+  const [params, setParams] = useSearchParams();
 
   const spotify = status?.spotify;
   const isBroadcaster = user?.role === "broadcaster";
+
+  // The OAuth callback comes back as a redirect, so its outcome is reported
+  // through the URL rather than a response the dashboard could read.
+  useEffect(() => {
+    const outcome = params.get("spotify");
+    if (!outcome) return;
+
+    if (outcome === "connected") push(t("common.saved"), "success");
+    else push(t("integrations.spotifyFailed"), "error");
+
+    params.delete("spotify");
+    setParams(params, { replace: true });
+  }, [params, push, setParams, t]);
 
   const connect = async () => {
     setBusy(true);

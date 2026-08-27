@@ -118,11 +118,20 @@ module.exports = function integrationRoutes(bot) {
 
     if (error || !code) {
       logger.warn(`Spotify authorization refused: ${error || "missing code"}`);
-      return res.redirect("/");
+      return res.redirect("/#/integrations?spotify=denied");
     }
 
-    await bot.spotifyManager.handleAuthorizationCode(code);
-    res.redirect("/#/integrations");
+    try {
+      await bot.spotifyManager.handleAuthorizationCode(code);
+    } catch (err) {
+      // An authorization code is single use and expires within minutes, so
+      // reloading this page replays a spent one. Reporting that back on the
+      // dashboard beats leaving the raw provider error on screen.
+      logger.error(`Spotify authorization failed: ${err.message}`);
+      return res.redirect("/#/integrations?spotify=error");
+    }
+
+    res.redirect("/#/integrations?spotify=connected");
   });
 
   return { router, spotifyCallback };

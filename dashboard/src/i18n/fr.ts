@@ -193,6 +193,7 @@ export const fr: Dictionary = {
     spotifyDisconnect: "Déconnecter",
     spotifyRevoked: "Accès révoqué, reconnecte le compte.",
     spotifyMissing: "Pas encore connecté.",
+    spotifyFailed: "Connexion Spotify échouée, relance-la depuis cette page.",
     spotifyDisabled: "Ajoute SPOTIFY_CLIENT_ID et SPOTIFY_CLIENT_SECRET dans .env.",
     nothingPlaying: "Aucune lecture en cours",
     obsScenes: "Scènes",

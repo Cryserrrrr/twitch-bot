@@ -191,6 +191,7 @@ export const en = {
     spotifyDisconnect: "Disconnect",
     spotifyRevoked: "Access revoked, reconnect the account.",
     spotifyMissing: "Not connected yet.",
+    spotifyFailed: "Spotify connection failed, start it again from this page.",
     spotifyDisabled: "Add SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET to .env.",
     nothingPlaying: "Nothing playing",
     obsScenes: "Scenes",
