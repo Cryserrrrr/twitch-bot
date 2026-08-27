@@ -17,8 +17,12 @@ RUN npm ci --omit=dev
 FROM node:22-bookworm-slim AS dashboard
 WORKDIR /app/dashboard
 
+# The build host injects NODE_ENV=production, which makes npm skip the
+# devDependencies this stage builds with (typescript, vite, tailwind).
+ENV NODE_ENV=development
+
 COPY dashboard/package.json dashboard/package-lock.json ./
-RUN npm ci
+RUN npm ci --include=dev
 
 COPY dashboard/ ./
 RUN npm run build
