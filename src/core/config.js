@@ -25,14 +25,41 @@ const webPort = int("WEB_PORT", 3000);
 const webHost = str("WEB_HOST", "127.0.0.1");
 const overlayPort = int("OVERLAY_PORT", webPort + 1);
 
+/** Addresses to listen on, never addresses a browser can be sent to. */
+const WILDCARD_HOSTS = new Set(["0.0.0.0", "::", "[::]"]);
+
+/**
+ * Origin of an explicitly configured OAuth redirect. It is the only other
+ * setting that has to carry the public address, so a deployment that sets it
+ * without PUBLIC_URL still gets usable links instead of the listen address.
+ */
+function originOf(url) {
+  try {
+    const parsed = new URL(url);
+    return WILDCARD_HOSTS.has(parsed.hostname) ? "" : parsed.origin;
+  } catch {
+    return "";
+  }
+}
+
 /**
  * Address the bot is reached at from the outside. Behind a reverse proxy this
  * is the public domain, which is what OAuth redirects and overlay URLs must be
  * built from; locally it falls back to the loopback address.
  */
 const configuredPublicUrl = str("PUBLIC_URL").replace(/\/+$/, "");
-const publicUrl = configuredPublicUrl || `https://${webHost}:${webPort}`;
-const isProxied = Boolean(configuredPublicUrl);
+const derivedPublicUrl = originOf(str("TWITCH_REDIRECT_URI"));
+const listenHost = WILDCARD_HOSTS.has(webHost) ? "127.0.0.1" : webHost;
+const publicUrl =
+  configuredPublicUrl || derivedPublicUrl || `https://${listenHost}:${webPort}`;
+
+/**
+ * A wildcard listen address only happens inside a container, where the proxy
+ * terminates TLS and the public domain differs from the listen address.
+ */
+const isProxied = Boolean(
+  configuredPublicUrl || (derivedPublicUrl && WILDCARD_HOSTS.has(webHost))
+);
 
 const config = {
   rootDir: ROOT_DIR,
