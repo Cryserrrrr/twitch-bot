@@ -18,6 +18,7 @@ module.exports = function integrationRoutes(bot) {
           scenes: await bot.obsManager.getScenes(),
         },
         apex: bot.apexManager.getStatus(),
+        discord: bot.discordManager.getConfig(),
       });
     })
   );
@@ -109,6 +110,39 @@ module.exports = function integrationRoutes(bot) {
         bot.apexManager.enabled ? bot.apexManager.getRank() : null,
       ]);
       res.json({ ...bot.apexManager.getStatus(), api: status, rank });
+    })
+  );
+
+  // Discord -----------------------------------------------------------------
+
+  router.get("/integrations/discord", (req, res) => {
+    res.json(bot.discordManager.getConfig());
+  });
+
+  router.put(
+    "/integrations/discord",
+    requireRole("broadcaster"),
+    route(async (req, res) => {
+      const { enabled, webhookUrl, message, mention, roleId, editOnEnd } =
+        req.body || {};
+      res.json(
+        await bot.discordManager.updateConfig({
+          enabled,
+          webhookUrl,
+          message,
+          mention,
+          roleId,
+          editOnEnd,
+        })
+      );
+    })
+  );
+
+  router.post(
+    "/integrations/discord/test",
+    requireRole("broadcaster"),
+    route(async (req, res) => {
+      res.json(await bot.discordManager.sendTest());
     })
   );
 

@@ -18,6 +18,7 @@ const EventSubManager = require("../integrations/eventSubManager");
 const SpotifyManager = require("../integrations/spotifyManager");
 const OBSManager = require("../integrations/obsManager");
 const ApexManager = require("../integrations/apexManager");
+const DiscordManager = require("../integrations/discordManager");
 
 const RECENT_MESSAGE_LIMIT = 200;
 const PRUNE_INTERVAL_MS = 6 * 60 * 60 * 1000;
@@ -74,6 +75,12 @@ class Bot extends EventEmitter {
     });
     await this.recurringMessages.load();
 
+    this.discordManager = new DiscordManager({
+      settings: this.settings,
+      translator: this.translator,
+      twitchApi: this.twitchApiManager,
+    });
+
     this.commandManager = new CommandManager(this);
 
     this.bindChat();
@@ -100,8 +107,11 @@ class Bot extends EventEmitter {
       this.emit("activity", activity);
     });
 
-    this.eventSubManager.on("stream", ({ live }) => {
-      this.setLive(live);
+    this.eventSubManager.on("stream", (change) => {
+      this.setLive(change.live);
+      // Only EventSub triggers announcements: the startup status check and
+      // OBS must never ping the Discord server.
+      this.discordManager.handleStream(change);
     });
 
     this.obsManager.on("streaming", (active) => {
@@ -298,6 +308,7 @@ class Bot extends EventEmitter {
     if (this.pruneTimer) clearInterval(this.pruneTimer);
 
     await Promise.allSettled([
+      this.discordManager?.pending,
       this.chat.stop(),
       this.eventSubManager.stop(),
       this.spotifyManager.stop(),

@@ -156,6 +156,15 @@ module.exports = {
     months: "{months} months",
   },
 
+  discord: {
+    defaultMessage: "{streamer} is live: **{title}** {url}",
+    testPrefix: "🧪 Test message, nobody was mentioned.",
+    liveNow: "Live on Twitch",
+    game: "Game",
+    ended: "Stream ended",
+    endedDescription: "The stream is over, it lasted {duration}.",
+  },
+
   moderation: {
     bannedWord: "banned word: {word}",
     unauthorizedLink: "link not allowed: {domain}",

@@ -5,6 +5,7 @@ const express = require("express");
 const config = require("../../core/config");
 const rootLogger = require("../../core/logger");
 const Translator = require("../../utils/translator");
+const DiscordManager = require("../../integrations/discordManager");
 const { route, requireRole } = require("../middleware");
 
 /**
@@ -119,7 +120,7 @@ module.exports = function systemRoutes(bot, realtime) {
     "/settings",
     route(async (req, res) => {
       res.json({
-        settings: bot.settings.all(),
+        settings: bot.settings.public(DiscordManager.SECRET_KEYS),
         language: bot.translator.getLanguage(),
         languages: Translator.available(),
         channel: config.bot.channel,
@@ -134,12 +135,18 @@ module.exports = function systemRoutes(bot, realtime) {
     route(async (req, res) => {
       const { language, ...patch } = req.body || {};
 
-      if (language) bot.translator.setLanguage(language);
-      const settings = Object.keys(patch).length
-        ? await bot.settings.update(patch)
-        : bot.settings.all();
+      // Discord keys go through /integrations/discord, which validates them.
+      for (const key of Object.keys(patch)) {
+        if (key.startsWith("discord")) delete patch[key];
+      }
 
-      res.json({ settings, language: bot.translator.getLanguage() });
+      if (language) bot.translator.setLanguage(language);
+      if (Object.keys(patch).length) await bot.settings.update(patch);
+
+      res.json({
+        settings: bot.settings.public(DiscordManager.SECRET_KEYS),
+        language: bot.translator.getLanguage(),
+      });
     })
   );
 

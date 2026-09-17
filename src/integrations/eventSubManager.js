@@ -325,13 +325,13 @@ class EventSubManager extends EventEmitter {
 
         case "stream.online":
           logger.info("Stream is live");
-          this.emit("stream", { live: true });
+          this.emit("stream", { live: true, event });
           this.emitActivity("stream.online", {});
           break;
 
         case "stream.offline":
           logger.info("Stream went offline");
-          this.emit("stream", { live: false });
+          this.emit("stream", { live: false, event });
           this.emitActivity("stream.offline", {});
           break;
 

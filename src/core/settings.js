@@ -29,6 +29,13 @@ class Settings extends EventEmitter {
     return { ...this.values };
   }
 
+  /** Same as all() without secrets, for anything sent to the dashboard. */
+  public(hidden = []) {
+    const values = this.all();
+    for (const key of hidden) delete values[key];
+    return values;
+  }
+
   async update(patch) {
     this.values = await this.database.updateSettings(patch);
     this.emit("change", this.values);

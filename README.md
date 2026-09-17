@@ -99,6 +99,20 @@ issuing a one-second timeout.
 | Spotify | `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET` | Connect it from the console; the refresh token is stored in `data/tokens/` |
 | OBS Studio | `OBS_HOST`, `OBS_PASSWORD` | Tools > WebSocket Server Settings; the bot reconnects on its own |
 | Apex Legends | `APEX_API_KEY`, `APEX_USERNAME` | <https://portal.mozambiquehe.re> |
+| Discord | Nothing in `.env` | Paste a channel webhook URL in Integrations > Discord |
+
+### Discord live announcements
+
+The bot posts to a Discord channel webhook when EventSub reports `stream.online`
+(reruns and premieres are ignored) and, if enabled, edits that post into a
+"stream ended" card with the duration on `stream.offline`. A stream that comes
+back within 15 minutes restores the same post instead of pinging again.
+
+Create the webhook under the channel's *Edit channel > Integrations > Webhooks*.
+The URL is a secret: it is stored in the database, never returned by the API, and
+only the broadcaster can change it. The message accepts `{streamer}`, `{title}`,
+`{game}` and `{url}`, and can mention nobody, `@everyone`, `@here` or a role.
+"Send a test" posts a sample without pinging anyone.
 
 Every integration is optional. A missing one is reported as disabled and the rest
 keeps running.
